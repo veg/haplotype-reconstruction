@@ -1,3 +1,13 @@
+#  This script will install ShoRAH into your current directory.
+#  to run it, type 
+#
+#    bash install-shorah.sh
+#
+#  Virtualenv needs to be installed prior to running this script.
+#  A new directory named 'shorah' will be created.
+#  ShoRAH's python script library will be located in ./shorah/bin
+#  after running this script.
+
 installDir=$(pwd)
 
 virtualenv shorah
@@ -31,11 +41,3 @@ eval "$configCommand"
 make -j4
 
 make install
-
-
-
-
-
-
-
-
