@@ -24,32 +24,13 @@ cd shorah-1.1.3
 
 configDir=$(pwd)
 
-configCommand="./configure --prefix="$shorahDir" PYTHON="$shorahDir"/bin/python
+configCommand="./configure --prefix="$shorahDir" PYTHON="$shorahDir"/bin/python"
+
+eval "$configCommand"
 
 make -j4
 
 make install
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
