@@ -41,3 +41,5 @@ eval "$configCommand"
 make -j4
 
 make install
+
+printf "\n\n\n          ShoRAH 1.1.3 has been installed.\n\n\n\n"
