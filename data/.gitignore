@@ -1,0 +1,9 @@
+*.fasta
+*.new
+*.fastq
+*.fq
+*.aln
+*.tar.gz
+*.bam
+*.fna
+*.json
