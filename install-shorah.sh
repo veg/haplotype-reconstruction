@@ -35,4 +35,4 @@ make -j4
 
 make install
 
-printf "\n\n\n          ShoRAH 1.1.3 has been installed.\n\n\n\n"
+printf "\n  ShoRAH 1.1.3 install script finished.\n\n"
