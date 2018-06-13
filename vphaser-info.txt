@@ -1,25 +1,36 @@
-------------------------------------------------------------------------
-
-
-            Installing and configuring VPhaser and VProfiler
-
-
-------------------------------------------------------------------------
+------------------- Obtaining VPhaser/VProfiler -----------------------
 
 VPhaser and VProfiler can be used to call haplotypes from a set of reads.
 VPhaser calls SNVs, while VProfiler performs haplotpe reconstruction.
 VProfiler is bundled with the VPhaser package. It can be downloaded at:
 
-	https://www.broadinstitute.org/viral-genomics/viral-genomics-analysis-software-registration
+   https://www.broadinstitute.org/viral-genomics/viral-genomics-analysis-software-registration
 
-First, install the dependencies of VPhaser. They can be installed by using
-conda, the package manager included in the Anaconda python distribution.
+The dependencies for VPhaser/VProfiler can be obtained and run using Anaconda, 
+which includes the associated package manager conda.
 If you do not have anaconda, download it from the link below and install:
 
 	https://www.anaconda.com/download/
 
-Some of the dependencies are located in the conda channel 'bioconda', which needs
-to be opened to download packages from. To do this, run:
+After setting up the anaconda environment, you may install VPhaser/VProfiler
+using the Quick Install or Manual Install Instructions below.
+
+
+------------------------ Quick Install --------------------------------
+
+Included in this package is a script to install VPhaser/VProfiler from the
+associated ZIP package. If you do not have the package, download it from
+the link above and place it in this directory. Then, run:
+
+	bash install-vphaser.sh
+
+This will install vphaser and its dependencies, and verify the installation.
+
+
+----------------- Manual Installation Instructions ---------------------
+
+Some of the dependencies of VPhaser/VProfiler are located in the conda channel 'bioconda', 
+which needs to be opened to download packages from. To do this, run:
 
 	conda config --add channels bioconda
 
@@ -48,10 +59,10 @@ the config file. Complete the configuration by entering:
 
 The installation is now complete.
 
------------------------------------------------------------------------
 
 Optionally, you can test the installation by running the test files included in the package.
-To do this, navigate to the directory containing the test files:
+If you installed this program using the Quick Install script, this step was performed automatically.
+To do this manually, navigate to the directory containing the test files:
 
 	cd TestData
 
