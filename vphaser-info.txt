@@ -1,0 +1,74 @@
+------------------------------------------------------------------------
+
+
+            Installing and configuring VPhaser and VProfiler
+
+
+------------------------------------------------------------------------
+
+VPhaser and VProfiler can be used to call haplotypes from a set of reads.
+VPhaser calls SNVs, while VProfiler performs haplotpe reconstruction.
+VProfiler is bundled with the VPhaser package. It can be downloaded at:
+
+	https://www.broadinstitute.org/viral-genomics/viral-genomics-analysis-software-registration
+
+First, install the dependencies of VPhaser. They can be installed by using
+conda, the package manager included in the Anaconda python distribution.
+If you do not have anaconda, download it from the link below and install:
+
+	https://www.anaconda.com/download/
+
+Some of the dependencies are located in the conda channel 'bioconda', which needs
+to be opened to download packages from. To do this, run:
+
+	conda config --add channels bioconda
+
+The dependencies are listed below. If you do not have any of them, or are unsure,
+run the corresponding conda command to install it to Anaconda:
+
+	Perl               conda install perl
+	R                  conda install -c r r 
+	R-gplots           conda install -c r r-gplots
+	samtools           conda install samtools
+	MOSAIK aligner     conda install mosaik
+	MUSCLE aligner     conda install muscle
+
+Download the VPhaser ZIP file and place it in the directory of your choice. Unzip it with:
+
+	unzip <filename>
+
+Then, navigate to the VPhaser directory:
+
+	cd VpSoftwarePackage
+
+If all of the required packages have been installed correctly, you won't have to change
+the config file. Complete the configuration by entering:
+
+	perl configPaths.pl configfile.txt
+
+The installation is now complete.
+
+-----------------------------------------------------------------------
+
+Optionally, you can test the installation by running the test files included in the package.
+To do this, navigate to the directory containing the test files:
+
+	cd TestData
+
+The TestData directory contains several sample data files. It also contains the directory 
+'ExpectedResults', which contain the expected output files from this test. After the test, 
+you can compare your files to the files in this directory to ensure that the program is working properly.
+First, run VPhaser on the QLX file, which contains aligned read data used as the input to VPhaser:
+
+	perl ../vphaser.pl -i rcVTest_final.qlx -o vp_VTest
+
+Next, run VProfiler to analyze the SNVs called by VPhaser and predict population haplotypes:
+
+	perl ../vprofiler.pl -i vprofiler_input_VTest.txt -o vpro -noendvariant=10 -nt -codon -haplo -haploseq
+
+VPhaser will create a new directory named 'vpro_haplotypes' containing the haplotypes and population information.
+The nucleotide and corresponding amino acid codon sequences of the haplotypes can be found in the files ending in
+_nuseq.fa and _aaseq.fa, respectively. The VTest output txt files contain the frequencies that these haplotypes
+were detected in the population.
+
+-----------------------------------------------------------------------
