@@ -66,3 +66,7 @@ if diff -q vpro_haplotypes/ ExpectedResults/vpro_haplotypes/; then
 else
 	printf "Warning: test output does not match sample output.\n"
 fi
+
+cd ..
+
+rm -r installtest
