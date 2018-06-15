@@ -13,3 +13,4 @@ shorah/
 *.log
 data/
 output/
+*.tar
