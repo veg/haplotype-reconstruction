@@ -1,3 +1,10 @@
+######################################
+#                                    #
+#       ShoRAH Testing Script        #
+#   For usage, see shorah-info.txt   #
+#                                    #
+######################################
+
 workingDir=$(pwd)
 
 eval "mkdir shorah-tests/$1"
