@@ -22,6 +22,8 @@ bash install.sh
 
 ## Pipeline
 
+Make sure the conda environment is activated with `source activate haplotype-reconstruction`.
+
 Generate synthetic data with distinct haplotypes and assemble:
 
 ```
