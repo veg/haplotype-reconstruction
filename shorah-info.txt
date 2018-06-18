@@ -51,5 +51,9 @@ To run ShoRAH on a dataset, type
 1, 2, 3, etc. As of writing, the latest version of veg-haplo-short.tar.gz contains 20 data sets,
 and veg-haplo-complete.tar.gz contains about 160.
 
-The results will be placed in the folder "shorah-tests" inside a directory
+	NOTE: ShoRAH may take several minutes to run, depending on the number of reads in the input files.
+				The sequence assembler will display "dispatched: " showing the number of reads. Test runs with
+				15000+ reads may take 10+ minutes to run.
+
+The results will be placed in the folder "shorah-tests" inside a directory 
 corresponding to the dataset number entered.

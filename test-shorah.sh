@@ -21,22 +21,10 @@ printf "\nAssembling reads...\n"
 
 eval "bealign -r $workingDir/env_C2V5.fas -e 0.5 -m HIV_BETWEEN_F -D discards.fna -R qfilt.fna aligned.bam"
 
-printf "\nRunning ShoRAH. This may take a few minutes.\n"
+printf "\nRunning ShoRAH. This may take a several minutes.\n"
 
 eval "shorah.py --bam aligned.bam --fasta $workingDir/env_C2V5.fas"
 
 testDir=$(pwd)
 
 printf "\nResults have been stored at $testDir\n\n"
-
-
-
-
-
-
-
-
-
-
-
-
