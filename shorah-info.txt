@@ -1,0 +1,55 @@
+#########################################
+#                                       #
+#     Installing and Testing ShoRAH     #
+#                                       #
+#########################################
+
+
+---------- Setup ----------
+
+The ShoRAH testing script runs on ShoRAH. If you do not have ShoRAH, install it by entering:
+
+	conda install -c bioconda -y shorah
+
+Make sure that ShoRAH has been set up properly by typing this in the command line:
+
+	shorah.py -h
+
+A help message from ShoRAH should appear.
+
+
+Next, obtain the latest copy of veg-haplo-short.tar.gz or veg-haplo-complete-tar.gz,
+and place it in this directory. Unzip it by entering:
+
+	tar -xvzf veg-haplo-short.tar.gz or
+	tar -xvzf veg-haplo-complete.tar.gz
+
+depending on the file you are using. 
+
+	NOTE: * veg-haplo-complete.tar.gz is a large file. It may take 10-20 minutes to unzip.
+        * Due to the large file sizes, the unzip may result in the command prompt appearing
+          to stall for a few minutes at the end of the unzip process.
+
+This will place the following items in this directory:
+
+	* a directory called "test-data", containing the data to run ShoRAH. Each dataset is numbered
+		sequentially 1, 2, 3, etc. and is located in test-data/454/
+	* an empty directory called "shorah-test", the output folder for the results of test-shorah.sh
+	* env_C2V5.fas, the reference sequence for the test data in FASTA format.
+
+---------- Usage -----------
+
+To run ShoRAH on a dataset, type
+
+	bash test-shorah.sh <number>
+
+		for example:
+
+	bash test-shorah.sh 10
+
+<number> is the dataset number. As mentioned in the Setup, each data set is numbered sequentially
+1, 2, 3, etc. As of writing, the latest version of veg-haplo-short.tar.gz contains 20 data sets,
+and veg-haplo-complete.tar.gz contains about 160.
+
+The results will be placed in the folder "shorah-tests" inside a directory
+corresponding to the dataset number entered.
