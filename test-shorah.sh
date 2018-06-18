@@ -7,6 +7,24 @@
 
 workingDir=$(pwd)
 
+if [ -d "shorah-tests/$1" ]; then
+	printf "\nThe directory $workingDir/shorah-tests/$1 already exists. This will overwrite the data in that directory.\n"
+	printf "Continue? [y/n]: "
+	read response
+	
+	if [[ "$response" == "n" || "$response" == "N" ]]; then
+		printf "\nExiting ShoRAH test script.\n\n"
+		exit
+	elif [[ "$response" == "y" || "$response" == "Y" ]]; then
+		printf "\nClearing shorah-tests/$1..."
+		eval "rm -r shorah-tests/$1"
+	else
+		printf "\nI didn't recognize that response. \
+            \nExiting ShoRAH test script.\n\n"
+		exit
+	fi
+fi
+
 eval "mkdir shorah-tests/$1"
 
 firstDataDir=$(ls -t test-data/454/$1/ | head -n 1)
