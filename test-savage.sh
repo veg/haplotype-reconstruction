@@ -14,7 +14,7 @@ do
   case $option in
     h) printf "\n\nUsage: bash test-savage.sh [OPTIONS] [dataset]\n"
 			 printf "Example: bash test-savage.sh -s 10 5\n"
-			 printf "For more information, see savage-info.sh\n\n"
+			 printf "For more information, see savage-info.txt\n\n"
 			 exit 0
     ;;
     s) server=$OPTARG
