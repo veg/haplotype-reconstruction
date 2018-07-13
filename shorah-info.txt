@@ -34,7 +34,7 @@ This will place the following items in this directory:
 
 	* a directory called "test-data", containing the data to run ShoRAH. Each dataset is numbered
 		sequentially 1, 2, 3, etc. and is located in test-data/454/
-	* an empty directory called "shorah-test", the output folder for the results of test-shorah.sh
+	* an empty directory called "shorah-tests", the output folder for the results of test-shorah.sh
 	* env_C2V5.fas, the reference sequence for the test data in FASTA format.
 
 ---------- Usage -----------
