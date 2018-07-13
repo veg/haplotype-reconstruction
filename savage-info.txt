@@ -5,7 +5,17 @@
 #########################################
 
 
----------- Setup ----------
+------------------------ About ----------------------
+
+SAVAGE is a program that can reconstruct haplotypes from a set of reads in FASTQ format
+using overlap graphs. SAVAGE supports de novo reconstruction; that is, without requiring
+a reference sequence. The test script uses the de novo method. SAVAGE also supports the
+reference-guided reconstruction common to most haplotyping software. This method runs
+much faster than the de-novo method, but may lead to bias in the results, based on
+the quality of the reference genome provided.
+
+
+----------------------- Setup ------------------------
 
 The SAVAGE testing script runs on SAVAGE. If you do not have SAVAGE installed,
 install it by running the included script:
@@ -37,7 +47,7 @@ This will place the following items in this directory:
 		for reference-based haplotype reconstruction, which will not be used in the current version
 		of the SAVAGE test script.
 
----------- Usage -----------
+--------------------- Usage -----------------------------
 
 To run SAVAGE on a dataset, type
 
@@ -59,9 +69,14 @@ For example, to run dataset 10 on server 5, run:
 1, 2, 3, etc. As of writing, the latest version of veg-haplo-short.tar.gz contains 20 data sets,
 and veg-haplo-complete.tar.gz contains about 160.
 
+If you see the console message "patch 0 - De novo overlap computations - Running rust-overlaps",
+then SAVAGE is running properly.
+
 	NOTE: SAVAGE may take several hours or days to run, depending on the number of reads in the input files.
 				After executing the script, SAVAGE will display the number of reads under the message "Input fastq stats".
  				Run time seems to be exponentially related to the number of reads. Datasets with a few thousand reads may
 				take minutes to run, while datasets with over 20,000 reads will likely take a day or more to run.
 
-The results will be placed in the folder "savage-tests" inside a directory corresponding to the dataset number entered.
+The output will be placed in the folder "savage-tests" inside a directory corresponding to the dataset number entered.
+The final haplotypes will be stored in the file contigs_stage_c.fasta, and a text file containing all the logs
+printed to stdout by the program will be stored at output.txt.
