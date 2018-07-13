@@ -1,8 +1,10 @@
 *.fasta
+*.qual
 *.new
 *.fastq
 *.fq
 *.aln
+*.tar
 *.tar.gz
 *.bam
 *.fna
@@ -11,5 +13,7 @@ shorah/
 *.fas
 *.fai
 *.log
-*.txt
 data/
+output/
+test-data/
+shorah-tests/

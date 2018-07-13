@@ -6,6 +6,10 @@
 #  The program virtualenv needs to be installed prior to running this script.
 #  A new directory named 'shorah' will be created.
 #  ShoRAH's python script library will be created in ./shorah/bin
+#
+#  NOTE: If you want to install ShoRAH using conda, you can do so by typing:
+#
+#    conda install -c bioconda -y shorah
 
 virtualenv shorah
 
