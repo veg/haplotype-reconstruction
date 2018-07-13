@@ -61,13 +61,16 @@ To run SAVAGE on a specific server, type:
 
 	bash test-savage.sh -s <server> <number>
 
-For example, to run dataset 10 on server 5, run:
+		for example, to run dataset 10 on server 5, run:
 
 	bash test-savage.sh -s 5 10
 
 <number> is the dataset number. As mentioned in the Setup, each data set is numbered sequentially
 1, 2, 3, etc. As of writing, the latest version of veg-haplo-short.tar.gz contains 20 data sets,
 and veg-haplo-complete.tar.gz contains about 160.
+
+<server> is the node on the cluster that the process will run on. The program will run on one of the
+CPUs on the specified node. If not specified, the process will run on the default node.
 
 If you see the console message "patch 0 - De novo overlap computations - Running rust-overlaps",
 then SAVAGE is running properly.
