@@ -18,3 +18,5 @@ output/
 test-data/
 shorah-tests/
 savage-tests/
+.DS_Store
+.snakemake
