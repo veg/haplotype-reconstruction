@@ -1,6 +1,7 @@
 import os
 
 
+# Evolution
 ACCESSION_NUMBERS = ['ERS6610%d' % i for i in range(87, 94)]
 HYPHY_PATH = "/Users/stephenshank/Software/lib/hyphy"
 
@@ -41,7 +42,7 @@ rule reconstruct_haplotypes:
   output:
     "output/{accession}/{reference}/haplotypes/final_haplo.fasta"
   script:
-    "invoke_regress_haplo.R"
+    "R/invoke_regress_haplo.R"
 
 rule concatenate:
   input:
@@ -114,4 +115,82 @@ rule full_analysis:
     "output/{reference}/results.tar.gz"
   shell:
     "tar cvzf {output} {input[0]} {input[1]}"
+
+
+# Reconstruction
+rule regress_haplo_full_pipeline:
+  input:
+    "input/haplotypes/{dataset}/reads.bam",
+    "input/haplotypes/{dataset}/reads.bam.bai"
+  output:
+    "output/haplotypes/{dataset}/full/final_haplo.fasta"
+  script:
+    "R/invoke_regress_haplo.R"
+
+rule regress_haplo_bam_to_variant_calls:
+  input:
+    "input/haplotypes/{dataset}/reads.bam",
+    "input/haplotypes/{dataset}/reads.bam.bai"
+  output:
+    "output/haplotypes/{dataset}/variant_calls.csv"
+  script:
+    "R/regress_haplo/bam_to_variant_calls.R"
+   
+rule regress_haplo_variant_calls_to_read_table:
+  input:
+    rules.regress_haplo_full_pipeline.input[0],
+    rules.regress_haplo_bam_to_variant_calls.output[0]
+  output:
+    "output/haplotypes/{dataset}/read_table.csv"
+  script:
+    "R/regress_haplo/variant_calls_to_read_table.R"
+
+rule regress_haplo_read_table_to_loci:
+  input:
+    rules.regress_haplo_variant_calls_to_read_table.output[0]
+  output:
+    "output/haplotypes/{dataset}/loci.csv"
+  script:
+    "R/regress_haplo/read_table_to_loci.R"
+
+rule regress_haplo_loci_to_haplotypes:
+  input:
+    rules.regress_haplo_read_table_to_loci.output[0]
+  output:
+    "output/haplotypes/{dataset}/h.csv"
+  script:
+    "R/regress_haplo/loci_to_haplotypes.R"
+
+rule regress_haplo_haplotypes_to_parameters:
+  input:
+    rules.regress_haplo_loci_to_haplotypes.output[0]
+  output:
+    "output/haplotypes/{dataset}/P.csv"
+  script:
+    "R/regress_haplo/haplotypes_to_parameters.R"
+
+rule regress_haplo_parameters_to_solutions:
+  input:
+    rules.regress_haplo_haplotypes_to_parameters.output[0]
+  output:
+    "output/haplotypes/{dataset}/solutions.csv"
+  script:
+    "R/regress_haplo/parameters_to_solutions.R"
+
+rule regress_haplo_solutions_to_haplotypes:
+  input:
+    rules.regress_haplo_parameters_to_solutions.output[0]
+  output:
+    "output/haplotypes/{dataset}/final_haplo.csv"
+  script:
+    "R/regress_haplo/solutions_to_haplotypes.R"
+
+rule regress_haplo_haplotypes_to_fasta:
+  input:
+    rules.regress_haplo_bam_to_variant_calls.input[0],
+    rules.regress_haplo_solutions_to_haplotypes.output[0]
+  output:
+    "output/haplotypes/{dataset}/final_haplo.fasta"
+  script:
+    "R/regress_haplo/haplotypes_to_fasta.R"
 
