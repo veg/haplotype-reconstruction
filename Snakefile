@@ -7,7 +7,7 @@ HYPHY_PATH = "/Users/stephenshank/Software/lib/hyphy"
 
 rule reference_index:
   input:
-    "input/{reference}.fasta"
+    "input/references/{reference}.fasta"
   output:
     "output/references/{reference}.fasta"
   shell:
@@ -18,7 +18,7 @@ rule reference_index:
 
 rule map_reads:
   input:
-    fastq="input/{accession}.fastq",
+    fastq="input/evolution/{accession}.fastq",
     reference=rules.reference_index.output
   output:
     "output/{accession}/{reference}/mapped.sam"
@@ -42,7 +42,7 @@ rule reconstruct_haplotypes:
   output:
     "output/{accession}/{reference}/haplotypes/final_haplo.fasta"
   script:
-    "R/invoke_regress_haplo.R"
+    "R/regress_haplo/full_pipeline.R"
 
 rule concatenate:
   input:
