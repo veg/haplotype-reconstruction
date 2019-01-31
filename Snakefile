@@ -16,9 +16,19 @@ rule reference_index:
       bwa index {output}
     """
 
+rule quality_control:
+  input:
+    "input/evolution/{accession}.fastq"
+  output:
+    fastq="output/{accession}/qc.fastq",
+    json="output/{accession}/fastp.json",
+    html="output/{accession}/fastp.html"
+  shell:
+    "fastp -A -q 10 -i {input} -o {output.fastq} -j {output.json} -h {output.html}"
+
 rule map_reads:
   input:
-    fastq="input/evolution/{accession}.fastq",
+    fastq=rules.quality_control.output[0],
     reference=rules.reference_index.output
   output:
     "output/{accession}/{reference}/mapped.sam"
