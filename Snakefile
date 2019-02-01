@@ -16,6 +16,47 @@ rule reference_index:
       bwa index {output}
     """
 
+rule extract_lanl:
+  input:
+    "input/LANL-HIV.fasta"
+  output:
+    "output/simulated/related_1/sequence.fasta",
+    "output/simulated/related_2/sequence.fasta",
+    "output/simulated/diverged_1/sequence.fasta",
+    "output/simulated/diverged_2/sequence.fasta"
+  shell:
+    "python python/extract_sequences.py"
+
+rule simulate_single:
+  input:
+    "output/simulated/{dataset}/sequence.fasta"
+  output:
+    reads="output/simulated/{dataset}/reads.fastq",
+    qc="output/simulated/{dataset}/qc.fastq",
+    json="output/simulated/{dataset}/qc.json",
+    html="output/simulated/{dataset}/qc.html"
+  shell:
+    """
+      art_illumina -ss HS25 -i {input} -l 120 -s 50 -c 15000 -o {output.reads}
+      mv {output.reads}.fq {output.reads}
+      fastp -A -q 10 -i {output.reads} -o {output.qc} -j {output.json} -h {output.html}
+    """
+
+rule simulate_mixed:
+  input:
+    "output/simulated/{dataset}_1/reads.fastq",
+    "output/simulated/{dataset}_2/reads.fastq"
+  output:
+    reads="output/simulated/{dataset}_joint/reads.fastq",
+    qc="output/simulated/{dataset}_joint/qc.fastq",
+    json="output/simulated/{dataset}_joint/qc.json",
+    html="output/simulated/{dataset}_joint/qc.html",
+  shell:
+    """
+      cat {input[0]} {input[1]} > {output.reads}
+      fastp -A -q 10 -i {output.reads} -o {output.qc} -j {output.json} -h {output.html}
+    """
+    
 rule quality_control:
   input:
     "input/evolution/{accession}.fastq"
