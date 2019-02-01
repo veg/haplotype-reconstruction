@@ -3,6 +3,8 @@ import os
 
 # Evolution
 ACCESSION_NUMBERS = ['ERS6610%d' % i for i in range(87, 94)]
+SIMULATED_DATASETS = ["related_1", "related_2", "diverged_1", "diverged_2"]
+REFERENCES = ["env_C2V5", "gag_p24", "pr", "rt"]
 HYPHY_PATH = "/Users/stephenshank/Software/lib/hyphy"
 
 rule reference_index:
@@ -20,50 +22,70 @@ rule extract_lanl:
   input:
     "input/LANL-HIV.fasta"
   output:
-    "output/simulated/related_1/sequence.fasta",
-    "output/simulated/related_2/sequence.fasta",
-    "output/simulated/diverged_1/sequence.fasta",
-    "output/simulated/diverged_2/sequence.fasta"
+    "output/simulation/related_1/sequence.fasta",
+    "output/simulation/related_2/sequence.fasta",
+    "output/simulation/diverged_1/sequence.fasta",
+    "output/simulation/diverged_2/sequence.fasta"
   shell:
     "python python/extract_sequences.py"
 
 rule simulate_single:
   input:
-    "output/simulated/{dataset}/sequence.fasta"
+    "output/simulation/{simulated_dataset}/sequence.fasta"
   output:
-    reads="output/simulated/{dataset}/reads.fastq",
-    qc="output/simulated/{dataset}/qc.fastq",
-    json="output/simulated/{dataset}/qc.json",
-    html="output/simulated/{dataset}/qc.html"
+    "output/{simulated_dataset}/reads.fastq",
   shell:
     """
-      art_illumina -ss HS25 -i {input} -l 120 -s 50 -c 15000 -o {output.reads}
-      mv {output.reads}.fq {output.reads}
-      fastp -A -q 10 -i {output.reads} -o {output.qc} -j {output.json} -h {output.html}
+      art_illumina -ss HS25 -i {input} -l 120 -s 50 -c 15000 -o {output}
+      mv {output}.fq {output}
     """
 
 rule simulate_mixed:
   input:
-    "output/simulated/{dataset}_1/reads.fastq",
-    "output/simulated/{dataset}_2/reads.fastq"
+    "output/{mixed_dataset}_1/reads.fastq",
+    "output/{mixed_dataset}_2/reads.fastq"
   output:
-    reads="output/simulated/{dataset}_joint/reads.fastq",
-    qc="output/simulated/{dataset}_joint/qc.fastq",
-    json="output/simulated/{dataset}_joint/qc.json",
-    html="output/simulated/{dataset}_joint/qc.html",
+    "output/{mixed_dataset}_joint/reads.fastq",
   shell:
     """
-      cat {input[0]} {input[1]} > {output.reads}
-      fastp -A -q 10 -i {output.reads} -o {output.qc} -j {output.json} -h {output.html}
+      cat {input[0]} {input[1]} > {output}
     """
-    
+
+rule situate_intrahost_data:
+  input:
+    "input/evolution/{accession_number}.fastq"
+  output:
+    "output/{accession_number}/reads.fastq"
+  shell:
+    "cp {input} {output}"
+
+rule all_simulated_reads:
+  input:
+    expand(
+      "output/{simulated_dataset}/reads.fastq",
+      simulated_dataset=SIMULATED_DATASETS
+    ),
+    expand(
+      "output/{mixed_dataset}_joint/reads.fastq",
+      mixed_dataset=['related', 'diverged']
+    )
+
+rule all_intrahost_reads:
+  input:
+    expand(
+      "output/{accession_number}/reads.fastq",
+      accession_number=ACCESSION_NUMBERS
+    )
+
 rule quality_control:
   input:
-    "input/evolution/{accession}.fastq"
+    "output/{dataset}/reads.fastq",
+    rules.all_simulated_reads.input,
+    rules.all_intrahost_reads.input
   output:
-    fastq="output/{accession}/qc.fastq",
-    json="output/{accession}/fastp.json",
-    html="output/{accession}/fastp.html"
+    fastq="output/{dataset}/qc.fastq",
+    json="output/{dataset}/fastp.json",
+    html="output/{dataset}/fastp.html"
   shell:
     "fastp -A -q 10 -i {input} -o {output.fastq} -j {output.json} -h {output.html}"
 
@@ -72,7 +94,7 @@ rule map_reads:
     fastq=rules.quality_control.output[0],
     reference=rules.reference_index.output
   output:
-    "output/{accession}/{reference}/mapped.sam"
+    "output/{dataset}/{reference}/mapped.sam"
   shell:
     "bwa mem {input.reference} {input.fastq} > {output}"
 
@@ -80,24 +102,25 @@ rule sort_and_index:
   input:
     rules.map_reads.output
   output:
-    "output/{accession}/{reference}/sorted.bam"
+    "output/{dataset}/{reference}/sorted.bam",
+    "output/{dataset}/{reference}/sorted.bam.bai"
   shell:
     """
-      samtools sort {input} > {output}
-      samtools index {output}
+      samtools sort {input} > {output[0]}
+      samtools index {output[0]}
     """
 
-rule reconstruct_haplotypes:
+rule regress_haplo_full_pipeline:
   input:
     rules.sort_and_index.output
   output:
-    "output/{accession}/{reference}/haplotypes/final_haplo.fasta"
+    "output/{dataset}/{reference}/full/final_haplo.fasta"
   script:
     "R/regress_haplo/full_pipeline.R"
 
 rule concatenate:
   input:
-    expand("output/{accession}/{{reference}}/haplotypes/final_haplo.fasta", accession=ACCESSION_NUMBERS)
+    expand("output/{dataset}/{{reference}}/full/final_haplo.fasta", dataset=ACCESSION_NUMBERS)
   output:
     "output/{reference}/unaligned.fasta"
   params:
@@ -167,32 +190,35 @@ rule full_analysis:
   shell:
     "tar cvzf {output} {input[0]} {input[1]}"
 
-
 # Reconstruction
-rule regress_haplo_full_pipeline:
+rule situate_regress_haplo_example:
   input:
-    "input/haplotypes/{dataset}/reads.bam",
-    "input/haplotypes/{dataset}/reads.bam.bai"
+    "input/reconstruction/regress_haplo.bam",
+    "input/reconstruction/regress_haplo.bam.bai"
   output:
-    "output/haplotypes/{dataset}/full/final_haplo.fasta"
-  script:
-    "R/invoke_regress_haplo.R"
+    "output/regress_haplo_example/mac239env/sorted.bam",
+    "output/regress_haplo_example/mac239env/sorted.bam.bai"
+  shell:
+    """
+      cp {input[0]} {output[0]}
+      cp {input[1]} {output[1]}
+    """
 
 rule regress_haplo_bam_to_variant_calls:
   input:
-    "input/haplotypes/{dataset}/reads.bam",
-    "input/haplotypes/{dataset}/reads.bam.bai"
+    "output/{dataset}/{reference}/sorted.bam",
+    "output/{dataset}/{reference}/sorted.bam.bai"
   output:
-    "output/haplotypes/{dataset}/variant_calls.csv"
+    "output/{dataset}/{reference}/variant_calls.csv"
   script:
     "R/regress_haplo/bam_to_variant_calls.R"
    
 rule regress_haplo_variant_calls_to_read_table:
   input:
-    rules.regress_haplo_full_pipeline.input[0],
-    rules.regress_haplo_bam_to_variant_calls.output[0]
+    "output/{dataset}/{reference}/sorted.bam",
+    "output/{dataset}/{reference}/variant_calls.csv",
   output:
-    "output/haplotypes/{dataset}/read_table.csv"
+    "output/{dataset}/{reference}/read_table.csv"
   script:
     "R/regress_haplo/variant_calls_to_read_table.R"
 
@@ -200,7 +226,7 @@ rule regress_haplo_read_table_to_loci:
   input:
     rules.regress_haplo_variant_calls_to_read_table.output[0]
   output:
-    "output/haplotypes/{dataset}/loci.csv"
+    "output/{dataset}/{reference}/loci.csv"
   script:
     "R/regress_haplo/read_table_to_loci.R"
 
@@ -208,7 +234,7 @@ rule regress_haplo_loci_to_haplotypes:
   input:
     rules.regress_haplo_read_table_to_loci.output[0]
   output:
-    "output/haplotypes/{dataset}/h.csv"
+    "output/{dataset}/{reference}/h.csv"
   script:
     "R/regress_haplo/loci_to_haplotypes.R"
 
@@ -216,7 +242,7 @@ rule regress_haplo_haplotypes_to_parameters:
   input:
     rules.regress_haplo_loci_to_haplotypes.output[0]
   output:
-    "output/haplotypes/{dataset}/P.csv"
+    "output/{dataset}/{reference}/P.csv"
   script:
     "R/regress_haplo/haplotypes_to_parameters.R"
 
@@ -224,7 +250,7 @@ rule regress_haplo_parameters_to_solutions:
   input:
     rules.regress_haplo_haplotypes_to_parameters.output[0]
   output:
-    "output/haplotypes/{dataset}/solutions.csv"
+    "output/{dataset}/{reference}/solutions.csv"
   script:
     "R/regress_haplo/parameters_to_solutions.R"
 
@@ -232,7 +258,7 @@ rule regress_haplo_solutions_to_haplotypes:
   input:
     rules.regress_haplo_parameters_to_solutions.output[0]
   output:
-    "output/haplotypes/{dataset}/final_haplo.csv"
+    "output/{dataset}/{reference}/final_haplo.csv"
   script:
     "R/regress_haplo/solutions_to_haplotypes.R"
 
@@ -241,7 +267,7 @@ rule regress_haplo_haplotypes_to_fasta:
     rules.regress_haplo_bam_to_variant_calls.input[0],
     rules.regress_haplo_solutions_to_haplotypes.output[0]
   output:
-    "output/haplotypes/{dataset}/final_haplo.fasta"
+    "output/{dataset}/{reference}/final_haplo.fasta"
   script:
     "R/regress_haplo/haplotypes_to_fasta.R"
 
