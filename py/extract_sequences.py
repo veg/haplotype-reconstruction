@@ -11,5 +11,5 @@ extraction_information = [
 
 for info in extraction_information:
   record = records[info['input_id']]
-  SeqIO.write(record, 'output/simulation/%s/genome.fasta' % info['output_id'], 'fasta')
+  SeqIO.write(record, 'output/%s/genome.fasta' % info['output_id'], 'fasta')
 

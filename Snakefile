@@ -1,9 +1,5 @@
 import os
 
-from python import get_orf
-from python import backtranslate
-from python import select_simulated_gene
-
 
 ACCESSION_NUMBERS = ['ERS6610%d' % i for i in range(87, 94)]
 SIMULATED_DATASETS = ["related_1", "related_2", "diverged_1", "diverged_2"]
@@ -20,20 +16,20 @@ rule extract_lanl:
   input:
     "input/LANL-HIV.fasta"
   output:
-    "output/simulation/related_1/genome.fasta",
-    "output/simulation/related_2/genome.fasta",
-    "output/simulation/diverged_1/genome.fasta",
-    "output/simulation/diverged_2/genome.fasta"
+    "output/related_1/genome.fasta",
+    "output/related_2/genome.fasta",
+    "output/diverged_1/genome.fasta",
+    "output/diverged_2/genome.fasta"
   shell:
     "python py/extract_sequences.py"
 
 rule extract_gene:
   input:
     reference="input/references/{gene}.fasta",
-    genome="output/simulation/{simulated_dataset}/genome.fasta"
+    genome="output/{simulated_dataset}/genome.fasta"
   output:
-    sam="output/simulation/{simulated_dataset}/{gene}/sequence.sam",
-    fasta="output/simulation/{simulated_dataset}/{gene}/sequence.fasta"
+    sam="output/{simulated_dataset}/{gene}/sequence.sam",
+    fasta="output/{simulated_dataset}/{gene}/sequence.fasta"
   shell:
     """
       bealign -r {input.reference} {input.genome} {output.sam}
@@ -45,17 +41,17 @@ rule align_simulated:
     reference="input/references/{gene}.fasta",
     target=rules.extract_gene.output.fasta
   output:
-    unaligned="output/simulation/{simulated_dataset}/{gene}/unaligned.fasta",
-    aligned="output/simulation/{simulated_dataset}/{gene}/aligned.fasta"
+    unaligned="output/{simulated_dataset}/{gene}/unaligned.fasta",
+    aligned="output/{simulated_dataset}/{gene}/aligned.fasta"
   shell:
     """
       cat {input.target} {input.reference} > {output.unaligned}
       mafft --localpair {output.unaligned} > {output.aligned}
     """
 
-rule simulate_single:
+rule amplicon_simulate_single:
   input:
-    "output/simulation/{simulated_dataset}/{gene}/sequence.fasta"
+    "output/{simulated_dataset}/{gene}/sequence.fasta"
   output:
     "output/{simulated_dataset}/{gene}/reads.fastq",
   shell:
@@ -64,73 +60,131 @@ rule simulate_single:
       mv {output}.fq {output}
     """
 
-rule simulate_mixed:
+rule amplicon_simulate_mixed:
   input:
     "output/{mixed_dataset}_1/{gene}/reads.fastq",
     "output/{mixed_dataset}_2/{gene}/reads.fastq"
   output:
     "output/{mixed_dataset}_joint/{gene}/reads.fastq",
   shell:
+    "cat {input[0]} {input[1]} > {output}"
+
+rule wgs_simulate_single:
+  input:
+    "output/{simulated_dataset}/genome.fasta"
+  output:
+    "output/{simulated_dataset}/reads.fastq"
+  shell:
     """
-      cat {input[0]} {input[1]} > {output}
+      art_illumina -ss HS25 -i {input} -l 120 -s 50 -c 15000 -o {output}
+      mv {output}.fq {output}
     """
 
-## Quality control
-#
-#rule fastp:
-#  input:
-#    "output/{dataset}/reads.fastq"
-#  output:
-#    fastq="output/{dataset}/qc.fastq",
-#    json="output/{dataset}/fastp.json",
-#    html="output/{dataset}/fastp.html"
-#  shell:
-#    "fastp -A -q 10 -i {input} -o {output.fastq} -j {output.json} -h {output.html}"
-#
-## Read mapping
-#
-#rule bwa_reference_index:
-#  input:
-#    "input/references/{reference}.fasta"
-#  output:
-#    "output/references/{reference}.fasta"
-#  shell:
-#    """
-#      cp {input} {output}
-#      bwa index {output}
-#    """
-#
-#rule bwa_map_reads:
-#  input:
-#    fastq=rules.quality_control.output[0],
-#    reference=rules.bwa_reference_index.output
-#  output:
-#    "output/{dataset}/{reference}/mapped.sam"
-#  shell:
-#    "bwa mem {input.reference} {input.fastq} > {output}"
-#
-#rule sort_and_index:
-#  input:
-#    rules.map_reads.output
-#  output:
-#    "output/{dataset}/{reference}/sorted.bam",
-#    "output/{dataset}/{reference}/sorted.bam.bai"
-#  shell:
-#    """
-#      samtools sort {input} > {output[0]}
-#      samtools index {output[0]}
-#    """
-#
-## Haplotype reconstruction (full pipelines)
-#
-#rule regress_haplo_full:
-#  input:
-#    rules.sort_and_index.output
-#  output:
-#    "output/{dataset}/{reference}/full/final_haplo.fasta"
-#  script:
-#    "R/regress_haplo/full_pipeline.R"
-#
+rule wgs_simulate_mixed:
+  input:
+    "output/{mixed_dataset}_1/reads.fastq",
+    "output/{mixed_dataset}_2/reads.fastq"
+  output:
+    "output/{mixed_dataset}_joint/reads.fastq"
+  shell:
+    "cat {input[0]} {input[1]} > {output}"
+
+# Situating other data
+
+rule situate_intrahost_data:
+  input:
+    "input/evolution/{accession_number}.fastq"
+  output:
+    "output/{accession_number}/reads.fastq"
+  shell:
+    "cp {input} {output}"
+
+# Quality control
+
+rule qfilt:
+  input:
+    "output/{dataset}/reads.fastq"
+  output:
+    fasta="output/{dataset}/qfilt/qc.fasta",
+    json="output/{dataset}/qfilt/qc.json",
+  shell:
+    "qfilt -Q {input} -q 20 -l 50 -P - -R 8 -j >> {output.fasta} 2>> {output.json}"
+
+
+rule fastp:
+  input:
+    "output/{dataset}/reads.fastq"
+  output:
+    fastq="output/{dataset}/fastp/qc.fastq",
+    json="output/{dataset}/fastp/qc.json",
+    html="output/{dataset}/fastp/qc.html"
+  shell:
+    "fastp -A -q 10 -i {input} -o {output.fastq} -j {output.json} -h {output.html}"
+
+rule trimmomatic:
+  input:
+    "output/{dataset}/reads.fastq"
+  output:
+    "output/{dataset}/trimmomatic/qc.fastq"
+  shell:
+    "trimmomatic SE {input} {output} ILLUMINACLIP:TruSeq3-SE:2:30:10 LEADING:3 TRAILING:3 SLIDINGWINDOW:4:15 MINLEN:36"
+
+# Read mapping
+
+rule bealign:
+  input:
+    qc="output/{dataset}/qfilt/qc.fasta",
+    reference="input/references/{gene}.fasta"
+  output:
+    bam="output/{dataset}/qfilt/bealign/{gene}/mapped.bam",
+    discards="output/{dataset}/qfilt/bealign/{gene}/discards.fasta"
+  shell:
+    "bealign -r {input.reference} -e 0.5 -m HIV_BETWEEN_F -D {output.discards} -R {input.qc} {output.bam}"
+
+
+rule bwa_reference_index:
+  input:
+    "input/references/{reference}.fasta"
+  output:
+    "output/references/{reference}.fasta"
+  shell:
+    """
+      cp {input} {output}
+      bwa index {output}
+    """
+
+rule bwa_map_reads:
+  input:
+    fastq="output/{dataset}/{qc}/qc.fastq",
+    reference="output/references/{reference}.fasta"
+  output:
+    "output/{dataset}/{qc}/bwa/{reference}/bwa/mapped.sam"
+  shell:
+    "bwa mem {input.reference} {input.fastq} > {output}"
+
+rule sort_and_index:
+  input:
+    "output/{dataset}/{qc}/{reference}/{read_mapper}/mapped.bam"
+  output:
+    "output/{dataset}/{qc}/{reference}/{read_mapper}/sorted.bam",
+    "output/{dataset}/{qc}/{reference}/{read_mapper}/sorted.bam.bai"
+  shell:
+    """
+      samtools sort {input} > {output[0]}
+      samtools index {output[0]}
+    """
+
+# Haplotype reconstruction (full pipelines)
+
+rule regress_haplo_full:
+  input:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.bam",
+    "output/{dataset}/{qc}/{read_mapped}/{reference}/sorted.bam.bai",
+  output:
+    "output/{dataset}/{qc}/bwa/{reference}/final_haplo.fasta"
+  script:
+    "R/regress_haplo/full_pipeline.R"
+
 ## Regress Haplo
 #
 #rule regress_haplo_bam_to_variant_calls:
