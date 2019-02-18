@@ -21,3 +21,4 @@ savage-tests/
 .DS_Store
 .snakemake
 messages.log*
+__pycache__

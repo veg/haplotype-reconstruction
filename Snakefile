@@ -1,5 +1,9 @@
 import os
 
+from python import get_orf
+from python import backtranslate
+from python import select_simulated_gene
+
 
 ACCESSION_NUMBERS = ['ERS6610%d' % i for i in range(87, 94)]
 SIMULATED_DATASETS = ["related_1", "related_2", "diverged_1", "diverged_2"]
@@ -21,61 +25,56 @@ rule extract_lanl:
     "output/simulation/diverged_1/genome.fasta",
     "output/simulation/diverged_2/genome.fasta"
   shell:
-    "python python/extract_sequences.py"
+    "python py/extract_sequences.py"
 
-rule translate_reference:
+rule extract_gene:
   input:
-    "input/references/{gene}.fasta"
+    reference="input/references/{gene}.fasta",
+    genome="output/simulation/{simulated_dataset}/genome.fasta"
   output:
-    "output/references/{gene}_aa.fasta"
-  shell:
-    "translate {input} {output}"
-
-rule translate_orf:
-  input:
-    "output/simulation/{simulated_dataset}/genome.fasta"
-  output:
-    genome_aa="output/simulation/{simulated_dataset}/genome_aa_orf-{orf}.fasta",
+    sam="output/simulation/{simulated_dataset}/{gene}/sequence.sam",
+    fasta="output/simulation/{simulated_dataset}/{gene}/sequence.fasta"
   shell:
     """
-      translate -f {wildcards.orf} {input} {output.genome_aa}
+      bealign -r {input.reference} {input.genome} {output.sam}
+      bam2msa {output.sam} {output.fasta}
     """
 
-rule align_translated_orfs_with_reference:
+rule align_simulated:
   input:
-    genome_aa=rules.translate_orf.output[0],
-    reference_aa=rules.translate_reference.output[0]
+    reference="input/references/{gene}.fasta",
+    target=rules.extract_gene.output.fasta
   output:
-    unaligned_aa="output/simulation/{simulated_dataset}/unaligned_{gene}_orf-{orf}_aa.fasta",
-    aligned_aa="output/simulation/{simulated_dataset}/aligned_{gene}_orf-{orf}_aa.fasta"
+    unaligned="output/simulation/{simulated_dataset}/{gene}/unaligned.fasta",
+    aligned="output/simulation/{simulated_dataset}/{gene}/aligned.fasta"
   shell:
     """
-      cat {input.genome_aa} {input.reference_aa} > {output.unaligned_aa}
-      mafft {output.unaligned_aa} > {output.aligned_aa}
+      cat {input.target} {input.reference} > {output.unaligned}
+      mafft --localpair {output.unaligned} > {output.aligned}
     """
 
-#rule simulate_single:
-#  input:
-#    "output/simulation/{simulated_dataset}/{gene}.fasta"
-#  output:
-#    "output/{simulated_dataset}/reads.fastq",
-#  shell:
-#    """
-#      art_illumina -ss HS25 -i {input} -l 120 -s 50 -c 15000 -o {output}
-#      mv {output}.fq {output}
-#    """
-#
-#rule simulate_mixed:
-#  input:
-#    "output/{mixed_dataset}_1/reads.fastq",
-#    "output/{mixed_dataset}_2/reads.fastq"
-#  output:
-#    "output/{mixed_dataset}_joint/reads.fastq",
-#  shell:
-#    """
-#      cat {input[0]} {input[1]} > {output}
-#    """
-#
+rule simulate_single:
+  input:
+    "output/simulation/{simulated_dataset}/{gene}/sequence.fasta"
+  output:
+    "output/{simulated_dataset}/{gene}/reads.fastq",
+  shell:
+    """
+      art_illumina -ss HS25 -i {input} -l 120 -s 50 -c 15000 -o {output}
+      mv {output}.fq {output}
+    """
+
+rule simulate_mixed:
+  input:
+    "output/{mixed_dataset}_1/{gene}/reads.fastq",
+    "output/{mixed_dataset}_2/{gene}/reads.fastq"
+  output:
+    "output/{mixed_dataset}_joint/{gene}/reads.fastq",
+  shell:
+    """
+      cat {input[0]} {input[1]} > {output}
+    """
+
 ## Quality control
 #
 #rule fastp:
