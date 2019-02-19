@@ -1,5 +1,7 @@
 import os
 
+from py import embed_and_reduce_dimensions_io
+
 
 ACCESSION_NUMBERS = ['ERS6610%d' % i for i in range(87, 94)]
 SIMULATED_DATASETS = ["related_1", "related_2", "diverged_1", "diverged_2"]
@@ -141,7 +143,6 @@ rule bealign:
   shell:
     "bealign -r {input.reference} -e 0.5 -m HIV_BETWEEN_F -D {output.discards} -R {input.qc} {output.bam}"
 
-
 rule bwa_reference_index:
   input:
     "input/references/{reference}.fasta"
@@ -158,20 +159,22 @@ rule bwa_map_reads:
     fastq="output/{dataset}/{qc}/qc.fastq",
     reference="output/references/{reference}.fasta"
   output:
-    "output/{dataset}/{qc}/bwa/{reference}/bwa/mapped.sam"
+    "output/{dataset}/{qc}/bwa/{reference}/mapped.sam"
   shell:
     "bwa mem {input.reference} {input.fastq} > {output}"
 
 rule sort_and_index:
   input:
-    "output/{dataset}/{qc}/{reference}/{read_mapper}/mapped.bam"
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/mapped.bam"
   output:
-    "output/{dataset}/{qc}/{reference}/{read_mapper}/sorted.bam",
-    "output/{dataset}/{qc}/{reference}/{read_mapper}/sorted.bam.bai"
+    bam="output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.bam",
+    fasta="output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.fasta",
+    index="output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.bam.bai"
   shell:
     """
-      samtools sort {input} > {output[0]}
-      samtools index {output[0]}
+      samtools sort {input} > {output.bam}
+      bam2msa {output.bam} {output.fasta}
+      samtools index {output.bam}
     """
 
 # Haplotype reconstruction (full pipelines)
@@ -179,11 +182,21 @@ rule sort_and_index:
 rule regress_haplo_full:
   input:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.bam",
-    "output/{dataset}/{qc}/{read_mapped}/{reference}/sorted.bam.bai",
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.bam.bai",
   output:
-    "output/{dataset}/{qc}/bwa/{reference}/final_haplo.fasta"
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/final_haplo.fasta"
   script:
     "R/regress_haplo/full_pipeline.R"
+
+# ACME haplotype reconstruction
+
+rule embed_and_reduce_dimensions:
+  input:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.fasta"
+  output:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/dr.csv"
+  run:
+    embed_and_reduce_dimensions_io(input[0], output[0])
 
 ## Regress Haplo
 #
