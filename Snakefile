@@ -194,9 +194,15 @@ rule embed_and_reduce_dimensions:
   input:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.fasta"
   output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/dr.csv"
+    full_2d="output/{dataset}/{qc}/{read_mapper}/{reference}/dr_2d.csv",
+    full_3d="output/{dataset}/{qc}/{read_mapper}/{reference}/dr_3d.csv",
+    blocks_2d="output/{dataset}/{qc}/{read_mapper}/{reference}/dr_blocks_2d.csv",
+    blocks_3d="output/{dataset}/{qc}/{read_mapper}/{reference}/dr_blocks_3d.csv"
   run:
-    embed_and_reduce_dimensions_io(input[0], output[0])
+    embed_and_reduce_dimensions_io(input[0], output.full_2d, blocks=False)
+    embed_and_reduce_dimensions_io(input[0], output.full_3d, blocks=False, ndim=3)
+    embed_and_reduce_dimensions_io(input[0], output.blocks_2d)
+    embed_and_reduce_dimensions_io(input[0], output.blocks_3d, ndim=3)
 
 ## Regress Haplo
 #
