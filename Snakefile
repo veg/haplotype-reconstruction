@@ -1,6 +1,8 @@
 import os
 
 from py import embed_and_reduce_dimensions_io
+from py import cluster_blocks_io
+from py import obtain_consensus_io
 
 
 ACCESSION_NUMBERS = ['ERS6610%d' % i for i in range(87, 94)]
@@ -159,7 +161,7 @@ rule bwa_map_reads:
     fastq="output/{dataset}/{qc}/qc.fastq",
     reference="output/references/{reference}.fasta"
   output:
-    "output/{dataset}/{qc}/bwa/{reference}/mapped.sam"
+    "output/{dataset}/{qc}/bwa/{reference}/mapped.bam"
   shell:
     "bwa mem {input.reference} {input.fastq} > {output}"
 
@@ -190,19 +192,44 @@ rule regress_haplo_full:
 
 # ACME haplotype reconstruction
 
+rule mmvc:
+  input:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.fasta"
+  output:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/mmvc.json"
+  shell:
+    "mmvc -j {output} {input}"
+
 rule embed_and_reduce_dimensions:
   input:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.fasta"
   output:
-    full_2d="output/{dataset}/{qc}/{read_mapper}/{reference}/dr_2d.csv",
-    full_3d="output/{dataset}/{qc}/{read_mapper}/{reference}/dr_3d.csv",
-    blocks_2d="output/{dataset}/{qc}/{read_mapper}/{reference}/dr_blocks_2d.csv",
-    blocks_3d="output/{dataset}/{qc}/{read_mapper}/{reference}/dr_blocks_3d.csv"
+    csv="output/{dataset}/{qc}/{read_mapper}/{reference}/dr_{dim}d.csv",
+    json="output/{dataset}/{qc}/{read_mapper}/{reference}/dr_{dim}d.json"
+  params:
+    dim=lambda w: int(w.dim)
   run:
-    embed_and_reduce_dimensions_io(input[0], output.full_2d, blocks=False)
-    embed_and_reduce_dimensions_io(input[0], output.full_3d, blocks=False, ndim=3)
-    embed_and_reduce_dimensions_io(input[0], output.blocks_2d)
-    embed_and_reduce_dimensions_io(input[0], output.blocks_3d, ndim=3)
+    embed_and_reduce_dimensions_io(input[0], output.csv, output.json, params.dim)
+
+rule cluster_blocks:
+  input:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/dr_{dim}d.csv"
+  output:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/clustered_{dim}d.csv"
+  params:
+    dim=lambda w: int(w.dim)
+  run:
+    cluster_blocks_io(input[0], output[0], params.dim)
+
+rule obtain_consensus:
+  input:
+    csv="output/{dataset}/{qc}/{read_mapper}/{reference}/clustered_{dim}d.csv",
+    fasta="output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.fasta",
+    json="output/{dataset}/{qc}/{read_mapper}/{reference}/dr_{dim}d.json"
+  output:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/contigs_{dim}d.fasta",
+  run:
+    obtain_consensus_io(input.csv, input.fasta, input.json, output[0])
 
 ## Regress Haplo
 #
