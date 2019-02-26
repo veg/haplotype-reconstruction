@@ -13,7 +13,8 @@ from sklearn.cluster import SpectralClustering
 
 
 def embed_and_reduce_dimensions(records, ndim=2):
-    nuc2ind = { '-': 0, 'A': 1, 'C': 2, 'G': 3, 'T': 4, 'Y': '2', 'R': 1, 'W': 1 }
+    iupac_nucleotides = list('ACGTRYSWKMBDHVN-')
+    nuc2ind = { nuc: i for i, nuc in enumerate(iupac_nucleotides) }
     index = []
     rows = []
     for record in records:
@@ -22,11 +23,22 @@ def embed_and_reduce_dimensions(records, ndim=2):
     index = pd.Series(index)
     numeric_fasta = np.array(rows, dtype=np.int)
     embedding = np.array([
-      [1, 0, 0, 0, 0],
-      [0, 1, 0, 0, 0],
-      [0, 0, 1, 0, 0],
-      [0, 0, 0, 1, 0],
-      [0, 0, 0, 0, 1],
+      [1,   0,   0,    0,   0], # A
+      [0,   1,   0,    0,   0], # C
+      [0,   0,   1,    0,   0], # G
+      [0,   0,   0,    1,   0], # T
+      [.5,  0,  .5,    0,   0], # R
+      [0,   .5,  0,    .5,  0], # Y
+      [0,   .5,  .5,   0,   0], # S
+      [.5,  0,   0,    .5,  0], # W
+      [0,   0,   .5,   .5,  0], # K
+      [.5,  .5,  0,    0,   0], # M
+      [0,   1/3, 1/3,  1/3, 0], # B
+      [1/3, 0,   1/3,  1/3, 0], # D
+      [1/3, 1/3, 0,    0/3, 0], # H
+      [1/3, 1/3, 1/3,  0,   0], # V
+      [.25, .25, .25, .25,  0], # N
+      [0,   0,   0,    0,   1], # -
     ])
     
     info_json = {

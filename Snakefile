@@ -196,13 +196,14 @@ rule mmvc:
   input:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.fasta"
   output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/mmvc.json"
+    json="output/{dataset}/{qc}/{read_mapper}/{reference}/mmvc.json",
+    fasta="output/{dataset}/{qc}/{read_mapper}/{reference}/mmvc.fasta"
   shell:
-    "mmvc -j {output} {input}"
+    "mmvc -j {output.json} -f {output.fasta} {input}"
 
 rule embed_and_reduce_dimensions:
   input:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.fasta"
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/mmvc.fasta"
   output:
     csv="output/{dataset}/{qc}/{read_mapper}/{reference}/dr_{dim}d.csv",
     json="output/{dataset}/{qc}/{read_mapper}/{reference}/dr_{dim}d.json"
