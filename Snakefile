@@ -7,6 +7,12 @@ from py import obtain_consensus_io
 
 ACCESSION_NUMBERS = ['ERS6610%d' % i for i in range(87, 94)]
 SIMULATED_DATASETS = ["related_1", "related_2", "diverged_1", "diverged_2"]
+RECONSTRUCTION_DATASETS = [
+  "93US141_100k_14-159320-1GN-0_S16_L001_R1_001",
+  "PP1L_S45_L001_R1_001",
+  "sergei1"
+]
+ALL_DATASETS = ACCESSION_NUMBERS + SIMULATED_DATASETS + RECONSTRUCTION_DATASETS
 REFERENCES = ["env_C2V5", "gag_p24", "pr", "rt"]
 HYPHY_PATH = "/Users/stephenshank/Software/lib/hyphy"
 
@@ -77,7 +83,7 @@ rule wgs_simulate_single:
   input:
     "output/{simulated_dataset}/genome.fasta"
   output:
-    "output/{simulated_dataset}/reads.fastq"
+    "output/{simulated_dataset}/simulated_reads.fastq"
   shell:
     """
       art_illumina -ss HS25 -i {input} -l 120 -s 50 -c 15000 -o {output}
@@ -89,17 +95,27 @@ rule wgs_simulate_mixed:
     "output/{mixed_dataset}_1/reads.fastq",
     "output/{mixed_dataset}_2/reads.fastq"
   output:
-    "output/{mixed_dataset}_joint/reads.fastq"
+    temp("output/{mixed_dataset}_joint/simulated_reads.fastq")
   shell:
     "cat {input[0]} {input[1]} > {output}"
 
 # Situating other data
 
+def situate_input(wildcards):
+  dataset = wildcards.dataset
+  is_evolution_dataset = dataset[:7] == 'ERS6610'
+  if is_evolution_dataset:
+    return "input/evolution/%s.fastq" % dataset
+  is_simulated_dataset = 'related' in dataset or 'diverged' in dataset
+  if is_simulated_dataset:
+    return "output/%s/simulated_reads.fastq" % dataset
+  return "input/reconstruction/%s.fastq" % dataset
+
 rule situate_intrahost_data:
   input:
-    "input/evolution/{accession_number}.fastq"
+    situate_input
   output:
-    "output/{accession_number}/reads.fastq"
+    "output/{dataset}/reads.fastq"
   shell:
     "cp {input} {output}"
 
@@ -113,7 +129,6 @@ rule qfilt:
     json="output/{dataset}/qfilt/qc.json",
   shell:
     "qfilt -Q {input} -q 20 -l 50 -P - -R 8 -j >> {output.fasta} 2>> {output.json}"
-
 
 rule fastp:
   input:
@@ -178,6 +193,14 @@ rule sort_and_index:
       bam2msa {output.bam} {output.fasta}
       samtools index {output.bam}
     """
+
+rule all_acme_bams:
+  input:
+    expand(
+      "output/{dataset}/qfilt/bealign/{reference}/sorted.bam",
+      dataset=ALL_DATASETS,
+      reference=REFERENCES
+    )
 
 # Haplotype reconstruction (full pipelines)
 
