@@ -6,7 +6,10 @@ from py import obtain_consensus_io
 
 
 ACCESSION_NUMBERS = ['ERS6610%d' % i for i in range(87, 94)]
-SIMULATED_DATASETS = ["related_1", "related_2", "diverged_1", "diverged_2"]
+SIMULATED_DATASETS = [
+  "related_1", "related_2", "related_joint", 
+  "diverged_1", "diverged_2", "diverged_joint"
+]
 RECONSTRUCTION_DATASETS = [
   "93US141_100k_14-159320-1GN-0_S16_L001_R1_001",
   "PP1L_S45_L001_R1_001",
@@ -128,7 +131,7 @@ rule qfilt:
     fasta="output/{dataset}/qfilt/qc.fasta",
     json="output/{dataset}/qfilt/qc.json",
   shell:
-    "qfilt -Q {input} -q 20 -l 50 -P - -R 8 -j >> {output.fasta} 2>> {output.json}"
+    "qfilt -Q {input} -q 15 -l 50 -P - -R 8 -j >> {output.fasta} 2>> {output.json}"
 
 rule fastp:
   input:
@@ -212,6 +215,36 @@ rule regress_haplo_full:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/final_haplo.fasta"
   script:
     "R/regress_haplo/full_pipeline.R"
+
+rule haploclique:
+  input:
+    bam="output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.bam",
+    index="output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.bam.bai"
+  output:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/haplo_clique/result.fasta"
+  params:
+    move="output/{dataset}/{qc}/{read_mapper}/{reference}/haplo_clique/result.fasta.fasta"
+  shell:
+    """
+      haploclique {input.bam} {output}
+      mv {params.move} {output}
+    """
+
+rule quasirecomb:
+  input:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.bam"
+  output:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/quasirecomb/output.fasta"
+  params:
+    basedir="output/{dataset}/{qc}/{read_mapper}/{reference}/quasirecomb/"
+  shell:
+    """
+      java -jar ~/QuasiRecomb.jar -i {input}
+      mv support/* {params.basedir}
+      rmdir support
+      mv piDist.txt {params.basedir}
+      mv quasispecies.fasta {params.basedir}/output.fasta
+    """
 
 # ACME haplotype reconstruction
 
