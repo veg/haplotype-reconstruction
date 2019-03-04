@@ -4,6 +4,7 @@ import json
 from py import extract_lanl_genome
 from py import simulate_amplicon_dataset 
 from py import simulate_wgs_dataset 
+from py import write_abayesqr_config
 from py import embed_and_reduce_dimensions_io
 from py import cluster_blocks_io
 from py import obtain_consensus_io
@@ -202,11 +203,13 @@ rule sort_and_index:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/mapped.bam"
   output:
     bam="output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.bam",
+    sam="output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.sam",
     fasta="output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.fasta",
     index="output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.bam.bai"
   shell:
     """
       samtools sort {input} > {output.bam}
+      samtools view -h {output.bam} > {output.sam}
       bam2msa {output.bam} {output.fasta}
       samtools index {output.bam}
     """
@@ -309,6 +312,22 @@ rule readreduce:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/haplocontigs.fasta"
   shell:
     "readreduce -a resolve -l 30 -s 16 -o {output} {input}"
+
+rule abayesqr:
+  input:
+    sam="output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.sam",
+    reference="input/references/{reference}.fasta"
+  output:
+    config="output/{dataset}/{qc}/{read_mapper}/{reference}/abayesqr/config",
+    freq="output/{dataset}/{qc}/{read_mapper}/{reference}/abayesqr/test_Freq.txt",
+    seq="output/{dataset}/{qc}/{read_mapper}/{reference}/abayesqr/test_Seq.txt",
+    viralseq="output/{dataset}/{qc}/{read_mapper}/{reference}/abayesqr/test_ViralSeq.txt"
+  run:
+    write_abayesqr_config(input.sam, input.reference, output.config)
+    shell("aBayesQR {output.config}")
+    shell("mv test_Freq.txt {output.freq}")
+    shell("mv test_Seq.txt {output.seq}")
+    shell("mv test_ViralSeq.txt {output.viralseq}")
 
 ## Regress Haplo
 #
