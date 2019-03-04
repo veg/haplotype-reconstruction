@@ -1,15 +1,18 @@
 import os
+import json
 
+from py import extract_lanl_genome
+from py import simulate_amplicon_dataset 
+from py import simulate_wgs_dataset 
 from py import embed_and_reduce_dimensions_io
 from py import cluster_blocks_io
 from py import obtain_consensus_io
 
 
+with open('simulations.json') as simulation_file:
+  SIMULATION_INFORMATION = json.load(simulation_file)
 ACCESSION_NUMBERS = ['ERS6610%d' % i for i in range(87, 94)]
-SIMULATED_DATASETS = [
-  "related_1", "related_2", "related_joint", 
-  "diverged_1", "diverged_2", "diverged_joint"
-]
+SIMULATED_DATASETS = list(SIMULATION_INFORMATION.keys())
 RECONSTRUCTION_DATASETS = [
   "93US141_100k_14-159320-1GN-0_S16_L001_R1_001",
   "PP1L_S45_L001_R1_001",
@@ -25,24 +28,21 @@ HYPHY_PATH = "/Users/stephenshank/Software/lib/hyphy"
 
 # Simulation
 
-rule extract_lanl:
+rule extract_lanl_genome:
   input:
     "input/LANL-HIV.fasta"
   output:
-    "output/related_1/genome.fasta",
-    "output/related_2/genome.fasta",
-    "output/diverged_1/genome.fasta",
-    "output/diverged_2/genome.fasta"
-  shell:
-    "python py/extract_sequences.py"
+    "output/lanl/{lanl_id}/genome.fasta"
+  run:
+    extract_lanl_genome(input[0], wildcards.lanl_id, output[0])
 
 rule extract_gene:
   input:
     reference="input/references/{gene}.fasta",
-    genome="output/{simulated_dataset}/genome.fasta"
+    genome="output/lanl/{lanl_id}/genome.fasta"
   output:
-    sam="output/{simulated_dataset}/{gene}/sequence.sam",
-    fasta="output/{simulated_dataset}/{gene}/sequence.fasta"
+    sam="output/lanl/{lanl_id}/{gene}/sequence.sam",
+    fasta="output/lanl/{lanl_id}/{gene}/sequence.fasta"
   shell:
     """
       bealign -r {input.reference} {input.genome} {output.sam}
@@ -62,45 +62,59 @@ rule align_simulated:
       mafft --localpair {output.unaligned} > {output.aligned}
     """
 
-rule amplicon_simulate_single:
+rule amplicon_simulation:
   input:
-    "output/{simulated_dataset}/{gene}/sequence.fasta"
+    "output/lanl/{lanl_id}/{gene}/sequence.fasta"
   output:
-    "output/{simulated_dataset}/{gene}/reads.fastq",
+    "output/lanl/{lanl_id}/{gene}/reads.fastq"
   shell:
     """
       art_illumina -ss HS25 -i {input} -l 120 -s 50 -c 15000 -o {output}
       mv {output}.fq {output}
     """
 
-rule amplicon_simulate_mixed:
-  input:
-    "output/{mixed_dataset}_1/{gene}/reads.fastq",
-    "output/{mixed_dataset}_2/{gene}/reads.fastq"
-  output:
-    "output/{mixed_dataset}_joint/{gene}/reads.fastq",
-  shell:
-    "cat {input[0]} {input[1]} > {output}"
+def amplicon_simulation_inputs(wildcards):
+  dataset = SIMULATION_INFORMATION[wildcards.simulated_dataset]
+  lanl_ids = [info['lanl_id'] for info in dataset]
+  reads = ["output/lanl/%s/%s/reads.fastq" % (lanl_id, wildcards.gene) for lanl_id in lanl_ids]
+  genes = ["output/lanl/%s/%s/sequence.fasta" % (lanl_id, wildcards.gene) for lanl_id in lanl_ids]
+  return reads + genes
 
-rule wgs_simulate_single:
+rule simulate_amplicon_dataset:
   input:
-    "output/{simulated_dataset}/genome.fasta"
+    amplicon_simulation_inputs
   output:
-    "output/{simulated_dataset}/simulated_reads.fastq"
+    fastq="output/simulation_{simulated_dataset}/{gene}/reads.fastq",
+    fasta="output/simulation_{simulated_dataset}/{gene}/truth.fasta"
+  run:
+    simulate_amplicon_dataset(wildcards.simulated_dataset, wildcards.gene, output.fastq, output.fasta)
+
+rule wgs_simulation:
+  input:
+    "output/lanl/{lanl_id}/genome.fasta"
+  output:
+    "output/lanl/{lanl_id}/wgs.fastq"
   shell:
     """
-      art_illumina -ss HS25 -i {input} -l 120 -s 50 -c 15000 -o {output}
+      art_illumina -ss HS25 -i {input} -l 120 -s 50 -c 150000 -o {output}
       mv {output}.fq {output}
     """
 
-rule wgs_simulate_mixed:
+def wgs_simulation_inputs(wildcards):
+  dataset = SIMULATION_INFORMATION[wildcards.simulated_dataset]
+  lanl_ids = [info['lanl_id'] for info in dataset]
+  reads = ["output/lanl/%s/wgs.fastq" % (lanl_id) for lanl_id in lanl_ids]
+  genomes = ["output/lanl/%s/genome.fasta" % (lanl_id) for lanl_id in lanl_ids]
+  return reads + genomes
+
+rule simulate_wgs_dataset:
   input:
-    "output/{mixed_dataset}_1/reads.fastq",
-    "output/{mixed_dataset}_2/reads.fastq"
+    wgs_simulation_inputs
   output:
-    temp("output/{mixed_dataset}_joint/simulated_reads.fastq")
-  shell:
-    "cat {input[0]} {input[1]} > {output}"
+    fastq="output/simulation_{simulated_dataset}/wgs.fastq",
+    fasta="output/simulation_{simulated_dataset}/truth.fasta"
+  run:
+    simulate_wgs_dataset(wildcards.simulated_dataset, output.fastq, output.fasta)
 
 # Situating other data
 
@@ -109,9 +123,9 @@ def situate_input(wildcards):
   is_evolution_dataset = dataset[:7] == 'ERS6610'
   if is_evolution_dataset:
     return "input/evolution/%s.fastq" % dataset
-  is_simulated_dataset = 'related' in dataset or 'diverged' in dataset
+  is_simulated_dataset = 'simulation' in dataset
   if is_simulated_dataset:
-    return "output/%s/simulated_reads.fastq" % dataset
+    return "output/%s/wgs.fastq" % dataset
   return "input/reconstruction/%s.fastq" % dataset
 
 rule situate_intrahost_data:
@@ -141,7 +155,7 @@ rule fastp:
     json="output/{dataset}/fastp/qc.json",
     html="output/{dataset}/fastp/qc.html"
   shell:
-    "fastp -A -q 10 -i {input} -o {output.fastq} -j {output.json} -h {output.html}"
+    "fastp -A -q 8 -i {input} -o {output.fastq} -j {output.json} -h {output.html}"
 
 rule trimmomatic:
   input:
@@ -287,6 +301,14 @@ rule obtain_consensus:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/contigs_{dim}d.fasta",
   run:
     obtain_consensus_io(input.csv, input.fasta, input.json, output[0])
+
+rule readreduce:
+  input:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/mmvc.fasta"
+  output:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/haplocontigs.fasta"
+  shell:
+    "readreduce -a resolve -l 30 -s 16 -o {output} {input}"
 
 ## Regress Haplo
 #
