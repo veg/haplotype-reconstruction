@@ -13,7 +13,7 @@ from py import obtain_consensus_io
 with open('simulations.json') as simulation_file:
   SIMULATION_INFORMATION = json.load(simulation_file)
 ACCESSION_NUMBERS = ['ERS6610%d' % i for i in range(87, 94)]
-SIMULATED_DATASETS = list(SIMULATION_INFORMATION.keys())
+SIMULATED_DATASETS = ['simulation_' + dataset for dataset in SIMULATION_INFORMATION.keys()]
 RECONSTRUCTION_DATASETS = [
   "93US141_100k_14-159320-1GN-0_S16_L001_R1_001",
   "PP1L_S45_L001_R1_001",
@@ -233,6 +233,14 @@ rule regress_haplo_full:
   script:
     "R/regress_haplo/full_pipeline.R"
 
+rule all_acme_regress_haplo:
+  input:
+    expand(
+      "output/{dataset}/qfilt/bealign/{reference}/final_haplo.fasta",
+      dataset=ALL_DATASETS,
+      reference=REFERENCES
+    )
+
 rule haploclique:
   input:
     bam="output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.bam",
@@ -262,6 +270,30 @@ rule quasirecomb:
       mv piDist.txt {params.basedir}
       mv quasispecies.fasta {params.basedir}/output.fasta
     """
+
+rule abayesqr:
+  input:
+    sam="output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.sam",
+    reference="input/references/{reference}.fasta"
+  output:
+    config="output/{dataset}/{qc}/{read_mapper}/{reference}/abayesqr/config",
+    freq="output/{dataset}/{qc}/{read_mapper}/{reference}/abayesqr/test_Freq.txt",
+    seq="output/{dataset}/{qc}/{read_mapper}/{reference}/abayesqr/test_Seq.txt",
+    viralseq="output/{dataset}/{qc}/{read_mapper}/{reference}/abayesqr/test_ViralSeq.txt"
+  run:
+    write_abayesqr_config(input.sam, input.reference, output.config)
+    shell("aBayesQR {output.config}")
+    shell("mv test_Freq.txt {output.freq}")
+    shell("mv test_Seq.txt {output.seq}")
+    shell("mv test_ViralSeq.txt {output.viralseq}")
+
+rule all_acme_abayesqr:
+  input:
+    expand(
+      "output/{dataset}/qfilt/bealign/{reference}/abayesqr/test_Seq.txt",
+      dataset=ALL_DATASETS,
+      reference=REFERENCES
+    )
 
 # ACME haplotype reconstruction
 
@@ -312,22 +344,6 @@ rule readreduce:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/haplocontigs.fasta"
   shell:
     "readreduce -a resolve -l 30 -s 16 -o {output} {input}"
-
-rule abayesqr:
-  input:
-    sam="output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.sam",
-    reference="input/references/{reference}.fasta"
-  output:
-    config="output/{dataset}/{qc}/{read_mapper}/{reference}/abayesqr/config",
-    freq="output/{dataset}/{qc}/{read_mapper}/{reference}/abayesqr/test_Freq.txt",
-    seq="output/{dataset}/{qc}/{read_mapper}/{reference}/abayesqr/test_Seq.txt",
-    viralseq="output/{dataset}/{qc}/{read_mapper}/{reference}/abayesqr/test_ViralSeq.txt"
-  run:
-    write_abayesqr_config(input.sam, input.reference, output.config)
-    shell("aBayesQR {output.config}")
-    shell("mv test_Freq.txt {output.freq}")
-    shell("mv test_Seq.txt {output.seq}")
-    shell("mv test_ViralSeq.txt {output.viralseq}")
 
 ## Regress Haplo
 #
