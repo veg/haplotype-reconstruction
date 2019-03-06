@@ -148,6 +148,16 @@ rule qfilt:
   shell:
     "qfilt -Q {input} -q 15 -l 50 -P - -R 8 -j >> {output.fasta} 2>> {output.json}"
 
+rule qfilt_454:
+  input:
+    fasta="input/reconstruction/3.GAC.454Reads.fna",
+    qual="input/reconstruction/3.GAC.454Reads.qual"
+  output:
+    fasta="output/454/qfilt/qc.fasta",
+    json="output/454/qfilt/qc.json"
+  shell:
+    "qfilt -F {input.fasta} {input.qual} -q 15 -l 50 -P - -R 8 -j >> {output.fasta} 2>> {output.json}"
+
 rule fastp:
   input:
     "output/{dataset}/reads.fastq"
