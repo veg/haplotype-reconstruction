@@ -10,9 +10,12 @@ from Bio.Align import AlignInfo
 from sklearn.manifold import TSNE
 from sklearn.mixture import BayesianGaussianMixture 
 from sklearn.cluster import SpectralClustering
+from sklearn.neighbors import NearestNeighbors
 
 
 def embed_and_reduce_dimensions(records, ndim=2):
+    overlap_fraction = .2
+
     iupac_nucleotides = list('ACGTRYSWKMBDHVN-')
     nuc2ind = { nuc: i for i, nuc in enumerate(iupac_nucleotides) }
     index = []
@@ -45,10 +48,10 @@ def embed_and_reduce_dimensions(records, ndim=2):
         'local_starts': [],
         'local_stops': []
     }
-    #mean_read_length = np.ceil(np.sum(numeric_fasta != 0, axis=1).mean())
-    mean_read_length = np.ceil(np.percentile(np.sum(numeric_fasta != 0, axis=1), 25))
+    gap_index = len(iupac_nucleotides) - 1
+    mean_read_length = np.ceil(np.percentile(np.sum(numeric_fasta != gap_index, axis=1), 25))
+    print('Total length %d, mean read length %d ' %(numeric_fasta.shape[1], mean_read_length))
     info_json['mean_read_length'] = mean_read_length
-    overlap_fraction = .5
     overlap = np.ceil(overlap_fraction*mean_read_length)
     stride = int(mean_read_length - overlap)
     coverage = np.sum(numeric_fasta != 0, axis=0)
@@ -66,11 +69,14 @@ def embed_and_reduce_dimensions(records, ndim=2):
 
         local_numeric_fasta = numeric_fasta[:, local_start:local_stop]
         desired_fraction = .8*(local_stop-local_start)
-        local_coverage = np.sum(local_numeric_fasta != 0, axis=1)
+        local_coverage = np.sum(local_numeric_fasta != gap_index, axis=1)
         local_sufficient_coverage = local_coverage > desired_fraction
         local_numeric_fasta = local_numeric_fasta[local_sufficient_coverage, :]
         n = local_numeric_fasta.shape[0]
         k = local_numeric_fasta.shape[1]
+        display_string = 'Working on block %d, shape (%d, %d), covering %d to %d...'
+        display_params = (i, n, k, local_start, local_stop)
+        print(display_string % display_params)
         embedded_fasta = np.reshape(embedding[local_numeric_fasta, :], newshape=(n, 5*k))
         reduced_dimensions = TSNE(
             n_components=ndim, n_iter=5000, random_state=0
@@ -106,10 +112,10 @@ def cluster_blocks(dr_df, ndim):
     columns = ['d%d' % (j+1) for j in range(ndim)]
     for block in range(n_blocks):
         current_block = dr_df.loc[dr_df['block'] == block, columns]
-        #clusters = BayesianGaussianMixture(n_components=5).fit(current_block).predict(current_block)
-        #dr_df.loc[dr_df['block'] == block, 'cluster'] = ['c%d' % cluster for cluster in clusters]
-        clusters = SpectralClustering(2).fit(current_block)
-        dr_df.loc[dr_df['block'] == block, 'cluster'] = ['c%d' % cluster for cluster in clusters.labels_]
+        clusters = BayesianGaussianMixture(n_components=5).fit(current_block).predict(current_block)
+        dr_df.loc[dr_df['block'] == block, 'cluster'] = ['c%d' % cluster for cluster in clusters]
+        #clusters = SpectralClustering(2).fit(current_block)
+        #dr_df.loc[dr_df['block'] == block, 'cluster'] = ['c%d' % cluster for cluster in clusters.labels_]
     return dr_df
 
 
