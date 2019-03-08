@@ -1,4 +1,6 @@
+import pdb
 import json
+from collections import OrderedDict
 
 import numpy as np
 import pandas as pd
@@ -171,4 +173,49 @@ def obtain_consensus_io(input_csv, input_fasta, input_json, output_fasta):
         info_json = json.load(json_file)
     contigs = obtain_consensus(cluster_df, reads, info_json)
     SeqIO.write(contigs, output_fasta, 'fasta')
+
+
+def superreads_to_haplotypes(superreads):
+    blocks = OrderedDict()
+    number_of_blocks = 0
+    for superread in superreads:
+        block = int(superread.name.split('_')[0].split('-')[1])
+        number_of_blocks = max(number_of_blocks, block)
+        if block in blocks:
+            blocks[block].append(superread)
+        else:
+            blocks[block] = [superread]
+    preferences = (number_of_blocks-1)*[[]]
+    for block_index in range(number_of_blocks-1):
+        next_block_index = block_index+1
+        block = blocks[block_index]
+        next_block = blocks[next_block_index]
+        scores = np.zeros((len(block), len(next_block)))
+        for i, superread in enumerate(block):
+            for j, next_superread in enumerate(next_block):
+                superread_np = np.array(list(str(superread.seq)), dtype='<U1')
+                next_superread_np = np.array(list(str(next_superread.seq)), dtype='<U1')
+                start = np.argmax(next_superread_np != '-')
+                stop = len(superread_np) - np.argmax(superread_np[::-1] != '-') - 1
+                agreement = (superread_np[start:stop] == next_superread[start:stop]).sum()
+                scores[i,j] = agreement
+        for j, next_superread in enumerate(next_block):
+            max_score = np.argmax(scores[:,j])
+            scores[max_score, :] = -1
+            superread = blocks[block_index][max_score]
+            superread_np = np.array(list(str(superread.seq)), dtype='<U1')
+            next_superread_np = np.array(list(str(next_superread.seq)), dtype='<U1')
+            stop = len(superread_np) - np.argmax(superread_np[::-1] != '-') - 1
+            next_superread_np[:stop] = superread_np[:stop]
+            next_superread.seq = Seq(''.join(next_superread_np))
+            print(block_index, j, next_superread.seq)
+            print(blocks[block_index][j].seq)
+    print(number_of_blocks)
+    return blocks[number_of_blocks-2]
+
+
+def superreads_to_haplotypes_io(input_fasta, output_fasta):
+    superreads = SeqIO.parse(input_fasta, 'fasta')
+    haplotypes = superreads_to_haplotypes(superreads)
+    SeqIO.write(haplotypes, output_fasta, 'fasta')
 

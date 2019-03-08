@@ -8,6 +8,7 @@ from py import write_abayesqr_config
 from py import embed_and_reduce_dimensions_io
 from py import cluster_blocks_io
 from py import obtain_consensus_io
+from py import superreads_to_haplotypes_io
 
 
 with open('simulations.json') as simulation_file:
@@ -375,6 +376,23 @@ rule readreduce:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/haplocontigs.fasta"
   shell:
     "readreduce -a resolve -l 30 -s 16 -o {output} {input}"
+
+rule superreads_to_haplotypes:
+  input:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/contigs_{dim}d.fasta"
+  output:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/haplotypes_{dim}d.fasta"
+  run:
+    superreads_to_haplotypes_io(input[0], output[0])
+
+rule haplotypes_and_truth:
+  input:
+    fasta="output/{dataset}/{qc}/{read_mapper}/{reference}/haplotypes_{dim}d.fasta",
+    reference="output/{dataset}/{reference}/truth.fasta"
+  output:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/truth_and_haplotypes_{dim}d.fasta"
+  shell:
+    "cat {input.reference} {input.fasta} > {output}"
 
 ## Regress Haplo
 #
