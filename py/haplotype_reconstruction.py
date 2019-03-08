@@ -10,6 +10,7 @@ from Bio.Align import AlignInfo
 from sklearn.manifold import TSNE
 from sklearn.mixture import BayesianGaussianMixture 
 from sklearn.cluster import SpectralClustering
+from sklearn.cluster import AgglomerativeClustering
 from sklearn.neighbors import NearestNeighbors
 
 
@@ -112,10 +113,16 @@ def cluster_blocks(dr_df, ndim):
     columns = ['d%d' % (j+1) for j in range(ndim)]
     for block in range(n_blocks):
         current_block = dr_df.loc[dr_df['block'] == block, columns]
-        clusters = BayesianGaussianMixture(n_components=5).fit(current_block).predict(current_block)
-        dr_df.loc[dr_df['block'] == block, 'cluster'] = ['c%d' % cluster for cluster in clusters]
+
+        #clusters = BayesianGaussianMixture(n_components=2).fit(current_block).predict(current_block)
+        #dr_df.loc[dr_df['block'] == block, 'cluster'] = ['c%d' % cluster for cluster in clusters]
+
         #clusters = SpectralClustering(2).fit(current_block)
         #dr_df.loc[dr_df['block'] == block, 'cluster'] = ['c%d' % cluster for cluster in clusters.labels_]
+
+        cluster = AgglomerativeClustering(n_clusters=2, linkage='single')
+        cluster.fit_predict(current_block)
+        dr_df.loc[dr_df['block'] == block, 'cluster'] = ['c%d' % cluster for cluster in cluster.labels_]
     return dr_df
 
 
@@ -131,12 +138,28 @@ def obtain_consensus(cluster_df, reads, info_json):
         current_block = cluster_df.loc[cluster_df['block'] == block, :]
         clusters = list(set(current_block.loc[:, 'cluster']))
         for cluster in clusters:
-            reads_in_cluster = current_block.loc[current_block['cluster'] == cluster, 'sequence_id']
-            msa = MultipleSeqAlignment([reads[read] for read in reads_in_cluster])
-            summary_info = AlignInfo.SummaryInfo(msa)
-            seq = str(summary_info.gap_consensus()).replace('X', '-')
-            record_id = 'block-%d_cluster-%s' % (block, cluster)
-            contig = SeqRecord(Seq(seq), id=record_id, description='')
+            print('Block %d, cluster %s...' % (block, cluster))
+            labels_of_reads_in_cluster = current_block.loc[current_block['cluster'] == cluster, 'sequence_id']
+            cluster_size = len(labels_of_reads_in_cluster)
+            msa = np.array(
+                [list(str(reads[label].seq)) for label in labels_of_reads_in_cluster],
+                dtype='<U1'
+            )
+            for i in range(msa.shape[0]):
+                  start = np.argmax(msa[i, :] != '-')
+                  stop = msa.shape[1] - np.argmax(msa[i,:][::-1] != '-')
+                  msa[i,:start] = '|'
+                  msa[i,stop:] = '|'
+            counts = np.array([
+                np.sum(msa == '-', axis=0),
+                np.sum(msa == 'A', axis=0),
+                np.sum(msa == 'C', axis=0),
+                np.sum(msa == 'G', axis=0),
+                np.sum(msa == 'T', axis=0)
+            ])
+            consensus = np.array(list('-ACGT'), dtype='<U1')[np.argmax(counts, axis=0)]
+            record_id = 'block-%d_cluster-%s_size-%d' % (block, cluster, cluster_size)
+            contig = SeqRecord(Seq(''.join(consensus)), id=record_id, description='')
             contigs.append(contig)
     return contigs
 

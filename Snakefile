@@ -337,6 +337,14 @@ rule cluster_blocks:
   run:
     cluster_blocks_io(input[0], output[0], params.dim)
 
+rule cluster_blocks_image:
+  input:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/clustered_2d.csv"
+  output:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/clustered_2d.png"
+  script:
+    "R/cluster_plot.R"
+
 rule obtain_consensus:
   input:
     csv="output/{dataset}/{qc}/{read_mapper}/{reference}/clustered_{dim}d.csv",
@@ -346,6 +354,19 @@ rule obtain_consensus:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/contigs_{dim}d.fasta",
   run:
     obtain_consensus_io(input.csv, input.fasta, input.json, output[0])
+
+rule superreads_and_truth:
+  input:
+    superreads="output/{dataset}/{qc}/{read_mapper}/{reference}/contigs_{dim}d.fasta",
+    truth="output/{dataset}/{reference}/truth.fasta"
+  output:
+    unaligned="output/{dataset}/{qc}/{read_mapper}/{reference}/truth_and_contigs_{dim}d_unaligned.fasta",
+    aligned="output/{dataset}/{qc}/{read_mapper}/{reference}/truth_and_contigs_{dim}d.fasta"
+  shell:
+    """
+      cat {input.truth} {input.superreads} > {output.unaligned}
+      mafft {output.unaligned} > {output.aligned}
+    """
 
 rule readreduce:
   input:
