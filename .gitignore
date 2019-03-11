@@ -23,4 +23,5 @@ messages.log*
 __pycache__
 node_modules
 yarn.lock
+package-lock.json
 .Rhistory
