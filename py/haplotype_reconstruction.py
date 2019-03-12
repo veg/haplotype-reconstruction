@@ -1,4 +1,3 @@
-import pdb
 import json
 from collections import OrderedDict
 
@@ -17,7 +16,7 @@ from sklearn.neighbors import NearestNeighbors
 
 
 def embed_and_reduce_dimensions(records, ndim=2):
-    overlap_fraction = .2
+    overlap_fraction = .3
 
     iupac_nucleotides = list('ACGTRYSWKMBDHVN-')
     nuc2ind = { nuc: i for i, nuc in enumerate(iupac_nucleotides) }
@@ -61,15 +60,18 @@ def embed_and_reduce_dimensions(records, ndim=2):
     sufficient_coverage = np.where(coverage >= 20)[0]
     start = sufficient_coverage[0]
     stop = sufficient_coverage[-1]
+    nblocks = np.ceil((stop-start)/stride)
+    starts = np.linspace(start, stop-mean_read_length, 15).astype(np.int)
+    stops = np.linspace(mean_read_length, stop, 15).astype(np.int)
+    info_json['local_starts'] = [int(i) for i in starts]
+    info_json['local_stops'] = [int(i) for i in stops]
+
     local_start = int(start)
     local_stop = int(local_start + mean_read_length)
 
     reduced_dimension_dfs = []
     i = 0
-    while local_stop < stop:
-        info_json['local_starts'].append(local_start)
-        info_json['local_stops'].append(local_stop)
-
+    for local_start, local_stop in zip(starts, stops):
         local_numeric_fasta = numeric_fasta[:, local_start:local_stop]
         desired_fraction = .8*(local_stop-local_start)
         local_coverage = np.sum(local_numeric_fasta != gap_index, axis=1)
@@ -186,7 +188,7 @@ def superreads_to_haplotypes(superreads):
         else:
             blocks[block] = [superread]
     preferences = (number_of_blocks-1)*[[]]
-    for block_index in range(number_of_blocks-1):
+    for block_index in range(number_of_blocks):
         next_block_index = block_index+1
         block = blocks[block_index]
         next_block = blocks[next_block_index]
@@ -211,7 +213,7 @@ def superreads_to_haplotypes(superreads):
             print(block_index, j, next_superread.seq)
             print(blocks[block_index][j].seq)
     print(number_of_blocks)
-    return blocks[number_of_blocks-2]
+    return blocks[number_of_blocks]
 
 
 def superreads_to_haplotypes_io(input_fasta, output_fasta):
