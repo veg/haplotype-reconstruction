@@ -5,7 +5,8 @@ module.exports = {
   entry: path.resolve("js", "app.jsx"),
   plugins: [
     new HtmlWebpackPlugin({
-      title: "ACME Haplotype Reconstruction"
+      title: "ACME Haplotype Reconstruction",
+      filename: "dashboard.html"
     })
   ],
   module: {
@@ -25,10 +26,6 @@ module.exports = {
     ]
   },
   devtool: "inline-source-map",
-  output: {
-    filename: "bundle.js",
-    path: path.resolve(__dirname, "dist")
-  },
   devServer: {
     contentBase: path.resolve(__dirname, "dist"),
     historyApiFallback: true

@@ -15,9 +15,7 @@ from sklearn.cluster import AgglomerativeClustering
 from sklearn.neighbors import NearestNeighbors
 
 
-def embed_and_reduce_dimensions(records, ndim=2):
-    overlap_fraction = .3
-
+def create_numeric_fasta(records):
     iupac_nucleotides = list('ACGTRYSWKMBDHVN-')
     nuc2ind = { nuc: i for i, nuc in enumerate(iupac_nucleotides) }
     index = []
@@ -27,6 +25,13 @@ def embed_and_reduce_dimensions(records, ndim=2):
         rows.append([nuc2ind[char] for char in record.seq])
     index = pd.Series(index)
     numeric_fasta = np.array(rows, dtype=np.int)
+    return index, numeric_fasta
+
+
+def embed_and_reduce_dimensions(records, ndim=2):
+    overlap_fraction = .3
+
+    index, numeric_fasta = create_numeric_fasta(records)
     embedding = np.array([
       [1,   0,   0,    0,   0], # A
       [0,   1,   0,    0,   0], # C
@@ -50,7 +55,7 @@ def embed_and_reduce_dimensions(records, ndim=2):
         'local_starts': [],
         'local_stops': []
     }
-    gap_index = len(iupac_nucleotides) - 1
+    gap_index = 15
     mean_read_length = np.ceil(np.percentile(np.sum(numeric_fasta != gap_index, axis=1), 25))
     print('Total length %d, mean read length %d ' %(numeric_fasta.shape[1], mean_read_length))
     info_json['mean_read_length'] = mean_read_length
@@ -220,4 +225,35 @@ def superreads_to_haplotypes_io(input_fasta, output_fasta):
     superreads = SeqIO.parse(input_fasta, 'fasta')
     haplotypes = superreads_to_haplotypes(superreads)
     SeqIO.write(haplotypes, output_fasta, 'fasta')
+
+
+def evaluate(input_haplotypes, input_truth, output_json):
+    haplotypes = SeqIO.parse(input_haplotypes, 'fasta')
+    truth = SeqIO.parse(input_truth, 'fasta')
+    haplotype_index, numeric_haplotypes = create_numeric_fasta(haplotypes)
+    truth_index, numeric_truth = create_numeric_fasta(truth)
+    full_numeric = np.vstack([numeric_truth, numeric_haplotypes])
+    counts = np.array([
+        np.sum(full_numeric == 15, axis=0),
+        np.sum(full_numeric == 0, axis=0),
+        np.sum(full_numeric == 1, axis=0),
+        np.sum(full_numeric == 2, axis=0),
+        np.sum(full_numeric == 3, axis=0)
+    ])
+    discordant = np.sum(counts == 0, axis=0) != 4
+    get_headers_as_strings = lambda index: [str(header) for header in index]
+    headers = get_headers_as_strings(truth_index)+get_headers_as_strings(haplotype_index)
+    n_headers = len(headers)
+    discordance_matrix = [n_headers*[0] for i in range(n_headers)]
+    for i in range(n_headers):
+        for j in range(n_headers):
+            discordance = np.sum(full_numeric[i,:] != full_numeric[j,:])
+            discordance_matrix[i][j] = int(discordance)
+    output = {
+        'number_of_discordant_sites': int(np.sum(discordant)),
+        'headers': headers,
+        'discordance_matrix': discordance_matrix
+    }
+    with open(output_json, 'w') as json_file:
+        json.dump(output, json_file, indent=2)
 

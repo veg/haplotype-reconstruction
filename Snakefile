@@ -9,6 +9,7 @@ from py import embed_and_reduce_dimensions_io
 from py import cluster_blocks_io
 from py import obtain_consensus_io
 from py import superreads_to_haplotypes_io
+from py import evaluate
 
 
 with open('simulations.json') as simulation_file:
@@ -387,12 +388,22 @@ rule superreads_to_haplotypes:
 
 rule haplotypes_and_truth:
   input:
-    fasta="output/{dataset}/{qc}/{read_mapper}/{reference}/haplotypes_{dim}d.fasta",
-    reference="output/{dataset}/{reference}/truth.fasta"
+    haplotypes="output/{dataset}/{qc}/{read_mapper}/{reference}/haplotypes_{dim}d.fasta",
+    truth="output/{dataset}/{reference}/truth.fasta"
   output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/truth_and_haplotypes_{dim}d.fasta"
+    fasta="output/{dataset}/{qc}/{read_mapper}/{reference}/truth_and_haplotypes_{dim}d.fasta",
+    json="output/{dataset}/{qc}/{read_mapper}/{reference}/truth_and_haplotypes_{dim}d.json"
+  run:
+    shell("cat {input.truth} {input.haplotypes} > {output.fasta}")
+    evaluate(input.haplotypes, input.truth, output.json)
+
+rule dashboard:
+  output:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/dashboard.html",
+  params:
+    path="output/{dataset}/{qc}/{read_mapper}/{reference}",
   shell:
-    "cat {input.reference} {input.fasta} > {output}"
+    "npx webpack --output-path {params.path}"
 
 ## Regress Haplo
 #
