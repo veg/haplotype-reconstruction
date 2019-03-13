@@ -1,5 +1,6 @@
 import json
 from collections import OrderedDict
+from collections import Counter
 
 import numpy as np
 import pandas as pd
@@ -184,38 +185,73 @@ def obtain_consensus_io(input_csv, input_fasta, input_json, output_fasta):
 
 def superreads_to_haplotypes(superreads):
     blocks = OrderedDict()
+    block_sizes = Counter()
     number_of_blocks = 0
     for superread in superreads:
+
         block = int(superread.name.split('_')[0].split('-')[1])
-        number_of_blocks = max(number_of_blocks, block)
+        size = int(superread.name.split('_')[2].split('-')[1])
+        block_sizes[block] += size
+        number_of_blocks = max(number_of_blocks, block+1)
+        superread_np = np.array(list(str(superread.seq)), dtype='<U1')
+        metadata = {
+            'bp': superread,
+            'np': superread_np,
+            'size': size,
+            'start': np.argmax(superread_np != '-'),
+            'stop': len(superread_np) - np.argmax(superread_np[::-1] != '-') - 1
+        }
         if block in blocks:
-            blocks[block].append(superread)
+            blocks[block].append(metadata)
         else:
-            blocks[block] = [superread]
-    preferences = (number_of_blocks-1)*[[]]
-    for block_index in range(number_of_blocks):
-        next_block_index = block_index+1
-        block = blocks[block_index]
-        next_block = blocks[next_block_index]
-        scores = np.zeros((len(block), len(next_block)))
-        for i, superread in enumerate(block):
-            for j, next_superread in enumerate(next_block):
-                superread_np = np.array(list(str(superread.seq)), dtype='<U1')
-                next_superread_np = np.array(list(str(next_superread.seq)), dtype='<U1')
-                start = np.argmax(next_superread_np != '-')
-                stop = len(superread_np) - np.argmax(superread_np[::-1] != '-') - 1
-                agreement = (superread_np[start:stop] == next_superread[start:stop]).sum()
-                scores[i, j] = agreement
-        for j, next_superread in enumerate(next_block):
-            max_score = np.argmax(scores[:, j])
-            scores[max_score, :] = -1
-            superread = blocks[block_index][max_score]
-            superread_np = np.array(list(str(superread.seq)), dtype='<U1')
-            next_superread_np = np.array(list(str(next_superread.seq)), dtype='<U1')
-            stop = len(superread_np) - np.argmax(superread_np[::-1] != '-') - 1
-            next_superread_np[:stop] = superread_np[:stop]
-            next_superread.seq = Seq(''.join(next_superread_np))
-    return blocks[number_of_blocks]
+            blocks[block] = [metadata]
+
+    no_empty_block = True
+    records = []
+    haplotype_length = len(blocks[0][0]['bp'].seq)
+    total_size = 0
+    while no_empty_block:
+        first_block_sizes = [item['size'] for item in blocks[0]]
+        max_size = max(first_block_sizes)
+        max_index = first_block_sizes.index(max_size)
+        preferences = [max_index]
+
+        for block_index in range(1, number_of_blocks):
+            last_preference_index = preferences[block_index-1]
+            last_preference = blocks[block_index-1][last_preference_index]
+            block = blocks[block_index]
+            scores = np.zeros(len(block))
+            stop = last_preference['stop']
+            for i, superread in enumerate(block):
+                start = superread['start']
+                agreement = (superread['np'][start:stop] == last_preference['np'][start:stop]).sum()
+                scores[i] = agreement
+            max_score = np.argmax(scores)
+            preferences.append(int(max_score))
+        
+        preferred_superreads = [blocks[i][preference] for i, preference in enumerate(preferences)]
+        haplotype_size = np.floor(np.mean([sr['size'] for sr in preferred_superreads]))
+        new_haplotype = np.array(haplotype_length*['-'], dtype='<U1')
+        for i, preference in enumerate(preferences):
+            preferred_superread = blocks[i][preference]
+            start = preferred_superread['start']
+            stop = preferred_superread['stop']
+            new_haplotype[start:stop] = preferred_superread['np'][start:stop]
+            blocks[i][preference]['size'] -= haplotype_size
+            block_sizes[i] -= haplotype_size
+            if block_sizes[i] <= 0:
+                no_empty_block = False
+        new_record = SeqRecord(
+            Seq(''.join(new_haplotype)),
+            id='haplotype-%d_size-%d' % (len(records)+1, haplotype_size),
+            description=''
+        )
+        records.append(new_record)
+        total_size += haplotype_size
+    for record in records:        
+        size = int(record.id.split('_')[1].split('-')[1])
+        record.id += '_freq-%f' % (size/total_size)
+    return records
 
 
 def superreads_to_haplotypes_io(input_fasta, output_fasta):

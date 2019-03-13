@@ -184,10 +184,10 @@ rule trimmomatic:
 rule bealign:
   input:
     qc="output/{dataset}/qfilt/qc.fasta",
-    reference="input/references/{gene}.fasta"
+    reference="input/references/{reference}.fasta"
   output:
-    bam="output/{dataset}/qfilt/bealign/{gene}/mapped.bam",
-    discards="output/{dataset}/qfilt/bealign/{gene}/discards.fasta"
+    bam="output/{dataset}/qfilt/bealign/{reference}/mapped.bam",
+    discards="output/{dataset}/qfilt/bealign/{reference}/discards.fasta"
   shell:
     "bealign -r {input.reference} -e 0.5 -m HIV_BETWEEN_F -D {output.discards} -R {input.qc} {output.bam}"
 
@@ -316,17 +316,17 @@ rule mmvc:
   input:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.fasta"
   output:
-    json="output/{dataset}/{qc}/{read_mapper}/{reference}/mmvc.json",
-    fasta="output/{dataset}/{qc}/{read_mapper}/{reference}/mmvc.fasta"
+    json="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/mmvc.json",
+    fasta="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/mmvc.fasta"
   shell:
     "mmvc -j {output.json} -f {output.fasta} {input}"
 
 rule embed_and_reduce_dimensions:
   input:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/mmvc.fasta"
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/mmvc.fasta"
   output:
-    csv="output/{dataset}/{qc}/{read_mapper}/{reference}/dr_{dim}d.csv",
-    json="output/{dataset}/{qc}/{read_mapper}/{reference}/dr_{dim}d.json"
+    csv="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/dr_{dim}d.csv",
+    json="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/dr_{dim}d.json"
   params:
     dim=lambda w: int(w.dim)
   run:
@@ -334,9 +334,9 @@ rule embed_and_reduce_dimensions:
 
 rule cluster_blocks:
   input:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/dr_{dim}d.csv"
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/dr_{dim}d.csv"
   output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/clustered_{dim}d.csv"
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/clustered_{dim}d.csv"
   params:
     dim=lambda w: int(w.dim)
   run:
@@ -344,30 +344,30 @@ rule cluster_blocks:
 
 rule cluster_blocks_image:
   input:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/clustered_2d.csv"
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/clustered_2d.csv"
   output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/clustered_2d.png",
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/counts_2d.png"
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/clustered_2d.png",
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/counts_2d.png"
   script:
     "R/cluster_plot.R"
 
-rule obtain_consensus:
+rule obtain_superreads:
   input:
-    csv="output/{dataset}/{qc}/{read_mapper}/{reference}/clustered_{dim}d.csv",
-    fasta="output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.fasta",
-    json="output/{dataset}/{qc}/{read_mapper}/{reference}/dr_{dim}d.json"
+    csv=rules.cluster_blocks.output[0],
+    fasta=rules.sort_and_index.output.fasta,
+    json=rules.embed_and_reduce_dimensions.output.json
   output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/superreads_{dim}d.fasta",
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/superreads_{dim}d.fasta",
   run:
     obtain_consensus_io(input.csv, input.fasta, input.json, output[0])
 
 rule superreads_and_truth:
   input:
-    superreads="output/{dataset}/{qc}/{read_mapper}/{reference}/superreads_{dim}d.fasta",
+    superreads="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/superreads_{dim}d.fasta",
     truth="output/{dataset}/{reference}/truth.fasta"
   output:
-    unaligned="output/{dataset}/{qc}/{read_mapper}/{reference}/truth_and_superreads_{dim}d_unaligned.fasta",
-    aligned="output/{dataset}/{qc}/{read_mapper}/{reference}/truth_and_superreads_{dim}d.fasta"
+    unaligned="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/truth_and_superreads_{dim}d_unaligned.fasta",
+    aligned="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/truth_and_superreads_{dim}d.fasta"
   shell:
     """
       cat {input.truth} {input.superreads} > {output.unaligned}
@@ -376,27 +376,27 @@ rule superreads_and_truth:
 
 rule readreduce:
   input:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/mmvc.fasta"
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/mmvc.fasta"
   output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/haplosuperreads.fasta"
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/haplosuperreads.fasta"
   shell:
     "readreduce -a resolve -l 30 -s 16 -o {output} {input}"
 
 rule superreads_to_haplotypes:
   input:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/superreads_{dim}d.fasta"
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/superreads_{dim}d.fasta"
   output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/haplotypes_{dim}d.fasta"
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/haplotypes_{dim}d.fasta"
   run:
     superreads_to_haplotypes_io(input[0], output[0])
 
 rule haplotypes_and_truth:
   input:
-    haplotypes="output/{dataset}/{qc}/{read_mapper}/{reference}/haplotypes_{dim}d.fasta",
+    haplotypes="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/haplotypes_{dim}d.fasta",
     truth="output/{dataset}/{reference}/truth.fasta"
   output:
-    fasta="output/{dataset}/{qc}/{read_mapper}/{reference}/truth_and_haplotypes_{dim}d.fasta",
-    json="output/{dataset}/{qc}/{read_mapper}/{reference}/truth_and_haplotypes_{dim}d.json"
+    fasta="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/truth_and_haplotypes_{dim}d.fasta",
+    json="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/truth_and_haplotypes_{dim}d.json"
   run:
     shell("cat {input.truth} {input.haplotypes} > {output.fasta}")
     evaluate(input.haplotypes, input.truth, output.json)
