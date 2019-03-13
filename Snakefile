@@ -10,6 +10,7 @@ from py import cluster_blocks_io
 from py import obtain_consensus_io
 from py import superreads_to_haplotypes_io
 from py import evaluate
+from py import parse_abayesqr_output
 
 
 with open('simulations.json') as simulation_file:
@@ -291,13 +292,15 @@ rule abayesqr:
     config="output/{dataset}/{qc}/{read_mapper}/{reference}/abayesqr/config",
     freq="output/{dataset}/{qc}/{read_mapper}/{reference}/abayesqr/test_Freq.txt",
     seq="output/{dataset}/{qc}/{read_mapper}/{reference}/abayesqr/test_Seq.txt",
-    viralseq="output/{dataset}/{qc}/{read_mapper}/{reference}/abayesqr/test_ViralSeq.txt"
+    viralseq="output/{dataset}/{qc}/{read_mapper}/{reference}/abayesqr/test_ViralSeq.txt",
+    fasta="output/{dataset}/{qc}/{read_mapper}/{reference}/abayesqr/haplotypes.fasta"
   run:
     write_abayesqr_config(input.sam, input.reference, output.config)
     shell("aBayesQR {output.config}")
     shell("mv test_Freq.txt {output.freq}")
     shell("mv test_Seq.txt {output.seq}")
     shell("mv test_ViralSeq.txt {output.viralseq}")
+    parse_abayesqr_output(output.viralseq, output.fasta)
 
 rule all_acme_abayesqr:
   input:
@@ -353,17 +356,17 @@ rule obtain_consensus:
     fasta="output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.fasta",
     json="output/{dataset}/{qc}/{read_mapper}/{reference}/dr_{dim}d.json"
   output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/contigs_{dim}d.fasta",
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/superreads_{dim}d.fasta",
   run:
     obtain_consensus_io(input.csv, input.fasta, input.json, output[0])
 
 rule superreads_and_truth:
   input:
-    superreads="output/{dataset}/{qc}/{read_mapper}/{reference}/contigs_{dim}d.fasta",
+    superreads="output/{dataset}/{qc}/{read_mapper}/{reference}/superreads_{dim}d.fasta",
     truth="output/{dataset}/{reference}/truth.fasta"
   output:
-    unaligned="output/{dataset}/{qc}/{read_mapper}/{reference}/truth_and_contigs_{dim}d_unaligned.fasta",
-    aligned="output/{dataset}/{qc}/{read_mapper}/{reference}/truth_and_contigs_{dim}d.fasta"
+    unaligned="output/{dataset}/{qc}/{read_mapper}/{reference}/truth_and_superreads_{dim}d_unaligned.fasta",
+    aligned="output/{dataset}/{qc}/{read_mapper}/{reference}/truth_and_superreads_{dim}d.fasta"
   shell:
     """
       cat {input.truth} {input.superreads} > {output.unaligned}
@@ -374,13 +377,13 @@ rule readreduce:
   input:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/mmvc.fasta"
   output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/haplocontigs.fasta"
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/haplosuperreads.fasta"
   shell:
     "readreduce -a resolve -l 30 -s 16 -o {output} {input}"
 
 rule superreads_to_haplotypes:
   input:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/contigs_{dim}d.fasta"
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/superreads_{dim}d.fasta"
   output:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/haplotypes_{dim}d.fasta"
   run:

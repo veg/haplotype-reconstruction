@@ -205,9 +205,9 @@ def superreads_to_haplotypes(superreads):
                 start = np.argmax(next_superread_np != '-')
                 stop = len(superread_np) - np.argmax(superread_np[::-1] != '-') - 1
                 agreement = (superread_np[start:stop] == next_superread[start:stop]).sum()
-                scores[i,j] = agreement
+                scores[i, j] = agreement
         for j, next_superread in enumerate(next_block):
-            max_score = np.argmax(scores[:,j])
+            max_score = np.argmax(scores[:, j])
             scores[max_score, :] = -1
             superread = blocks[block_index][max_score]
             superread_np = np.array(list(str(superread.seq)), dtype='<U1')
@@ -215,9 +215,6 @@ def superreads_to_haplotypes(superreads):
             stop = len(superread_np) - np.argmax(superread_np[::-1] != '-') - 1
             next_superread_np[:stop] = superread_np[:stop]
             next_superread.seq = Seq(''.join(next_superread_np))
-            print(block_index, j, next_superread.seq)
-            print(blocks[block_index][j].seq)
-    print(number_of_blocks)
     return blocks[number_of_blocks]
 
 
@@ -256,4 +253,20 @@ def evaluate(input_haplotypes, input_truth, output_json):
     }
     with open(output_json, 'w') as json_file:
         json.dump(output, json_file, indent=2)
+
+
+def parse_abayesqr_output(input_text, output_fasta):
+    with open(input_text) as input_file:
+        lines = input_file.readlines()
+    records = []
+    for i, line in enumerate(lines):
+        if i % 2 == 0:
+            freq = float(line.split()[-1])
+            number = int(i/2)+1
+            header = 'haplotype-%d_freq-%f' % (number, freq)
+        if i % 2 == 1:
+            seq = Seq(line.strip())
+            record = SeqRecord(seq, id=header, description='')
+            records.append(record)
+    SeqIO.write(records, output_fasta, 'fasta')
 
