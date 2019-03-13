@@ -340,9 +340,11 @@ rule cluster_blocks:
 
 rule cluster_blocks_image:
   input:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/clustered.csv"
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/clustered.csv",
+    "output/{dataset}/{reference}/truth.fasta"
   output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/clustered.png",
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/clustered_truth.png",
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/clustered_inferred.png",
     "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/counts.png"
   script:
     "R/cluster_plot.R"
