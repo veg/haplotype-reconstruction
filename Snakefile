@@ -346,7 +346,8 @@ rule cluster_blocks_image:
   input:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/clustered_2d.csv"
   output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/clustered_2d.png"
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/clustered_2d.png",
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/counts_2d.png"
   script:
     "R/cluster_plot.R"
 
