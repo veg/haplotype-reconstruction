@@ -5,7 +5,7 @@ from py import extract_lanl_genome
 from py import simulate_amplicon_dataset 
 from py import simulate_wgs_dataset 
 from py import write_abayesqr_config
-from py import embed_and_reduce_dimensions_io
+from py import embed_and_reduce_all_dimensions_io
 from py import cluster_blocks_io
 from py import obtain_consensus_io
 from py import superreads_to_haplotypes_io
@@ -325,29 +325,25 @@ rule embed_and_reduce_dimensions:
   input:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/mmvc.fasta"
   output:
-    csv="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/dr_{dim}d.csv",
-    json="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/dr_{dim}d.json"
-  params:
-    dim=lambda w: int(w.dim)
+    csv="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/dr.csv",
+    json="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/dr.json"
   run:
-    embed_and_reduce_dimensions_io(input[0], output.csv, output.json, params.dim)
+    embed_and_reduce_all_dimensions_io(input[0], output.csv, output.json)
 
 rule cluster_blocks:
   input:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/dr_{dim}d.csv"
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/dr.csv"
   output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/clustered_{dim}d.csv"
-  params:
-    dim=lambda w: int(w.dim)
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/clustered.csv"
   run:
-    cluster_blocks_io(input[0], output[0], params.dim)
+    cluster_blocks_io(input[0], output[0])
 
 rule cluster_blocks_image:
   input:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/clustered_2d.csv"
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/clustered.csv"
   output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/clustered_2d.png",
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/counts_2d.png"
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/clustered.png",
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/counts.png"
   script:
     "R/cluster_plot.R"
 
@@ -357,17 +353,17 @@ rule obtain_superreads:
     fasta=rules.sort_and_index.output.fasta,
     json=rules.embed_and_reduce_dimensions.output.json
   output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/superreads_{dim}d.fasta",
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/superreads.fasta",
   run:
     obtain_consensus_io(input.csv, input.fasta, input.json, output[0])
 
 rule superreads_and_truth:
   input:
-    superreads="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/superreads_{dim}d.fasta",
+    superreads="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/superreads.fasta",
     truth="output/{dataset}/{reference}/truth.fasta"
   output:
-    unaligned="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/truth_and_superreads_{dim}d_unaligned.fasta",
-    aligned="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/truth_and_superreads_{dim}d.fasta"
+    unaligned="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/truth_and_superreads_unaligned.fasta",
+    aligned="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/truth_and_superreads.fasta"
   shell:
     """
       cat {input.truth} {input.superreads} > {output.unaligned}
@@ -384,19 +380,19 @@ rule readreduce:
 
 rule superreads_to_haplotypes:
   input:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/superreads_{dim}d.fasta"
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/superreads.fasta"
   output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/haplotypes_{dim}d.fasta"
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/haplotypes.fasta"
   run:
     superreads_to_haplotypes_io(input[0], output[0])
 
 rule haplotypes_and_truth:
   input:
-    haplotypes="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/haplotypes_{dim}d.fasta",
+    haplotypes="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/haplotypes.fasta",
     truth="output/{dataset}/{reference}/truth.fasta"
   output:
-    fasta="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/truth_and_haplotypes_{dim}d.fasta",
-    json="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/truth_and_haplotypes_{dim}d.json"
+    fasta="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/truth_and_haplotypes.fasta",
+    json="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/truth_and_haplotypes.json"
   run:
     shell("cat {input.truth} {input.haplotypes} > {output.fasta}")
     evaluate(input.haplotypes, input.truth, output.json)

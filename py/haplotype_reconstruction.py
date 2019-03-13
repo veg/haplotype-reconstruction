@@ -1,4 +1,5 @@
 import json
+from multiprocessing import Pool
 from collections import OrderedDict
 from collections import Counter
 
@@ -29,10 +30,9 @@ def create_numeric_fasta(records):
     return index, numeric_fasta
 
 
-def embed_and_reduce_dimensions(records, ndim=2):
-    overlap_fraction = .3
-
-    index, numeric_fasta = create_numeric_fasta(records)
+def embed_and_reduce_dimensions(arguments):
+    gap_index = 15
+    numeric_fasta, local_start, local_stop, index, i = arguments
     embedding = np.array([
       [1,   0,   0,    0,   0], # A
       [0,   1,   0,    0,   0], # C
@@ -51,7 +51,33 @@ def embed_and_reduce_dimensions(records, ndim=2):
       [.25, .25, .25, .25,  0], # N
       [0,   0,   0,    0,   1], # -
     ])
-    
+    local_numeric_fasta = numeric_fasta[:, local_start:local_stop]
+    desired_fraction = .8*(local_stop-local_start)
+    local_coverage = np.sum(local_numeric_fasta != gap_index, axis=1)
+    local_sufficient_coverage = local_coverage > desired_fraction
+    local_numeric_fasta = local_numeric_fasta[local_sufficient_coverage, :]
+    n = local_numeric_fasta.shape[0]
+    k = local_numeric_fasta.shape[1]
+    display_string = 'Working on block %d, shape (%d, %d), covering %d to %d...'
+    display_params = (i, n, k, local_start, local_stop)
+    print(display_string % display_params)
+    embedded_fasta = np.reshape(embedding[local_numeric_fasta, :], newshape=(n, 5*k))
+    reduced_dimensions = TSNE(
+        n_components=2, n_iter=5000, random_state=0
+    ).fit_transform(embedded_fasta)
+    columns = ['d%d' % (j+1) for j in range(2)]
+    ids = pd.DataFrame({
+        'sequence_id': index[local_sufficient_coverage],
+        'block': n*[i]
+    }).reset_index()
+    rd_df = pd.DataFrame(reduced_dimensions, columns=columns).reset_index()
+    df = pd.concat([ids, rd_df], axis=1).drop(columns='index')
+    print('...done block %d!' % i)
+    return df
+
+
+def embed_and_reduce_all_dimensions(records, overlap_fraction=.5, ncpu=20):
+    index, numeric_fasta = create_numeric_fasta(records)
     info_json = {
         'local_starts': [],
         'local_stops': []
@@ -66,52 +92,24 @@ def embed_and_reduce_dimensions(records, ndim=2):
     sufficient_coverage = np.where(coverage >= 20)[0]
     start = sufficient_coverage[0]
     stop = sufficient_coverage[-1]
-    nblocks = np.ceil((stop-start)/stride)
-    starts = np.linspace(start, stop-mean_read_length, 15).astype(np.int)
-    stops = np.linspace(mean_read_length, stop, 15).astype(np.int)
+    nblocks = int(np.ceil((stop-start)/stride))
+    starts = np.linspace(start, stop-mean_read_length, nblocks).astype(np.int)
+    stops = np.linspace(mean_read_length, stop, nblocks).astype(np.int)
     info_json['local_starts'] = [int(i) for i in starts]
     info_json['local_stops'] = [int(i) for i in stops]
-
-    local_start = int(start)
-    local_stop = int(local_start + mean_read_length)
-
-    reduced_dimension_dfs = []
-    i = 0
-    for local_start, local_stop in zip(starts, stops):
-        local_numeric_fasta = numeric_fasta[:, local_start:local_stop]
-        desired_fraction = .8*(local_stop-local_start)
-        local_coverage = np.sum(local_numeric_fasta != gap_index, axis=1)
-        local_sufficient_coverage = local_coverage > desired_fraction
-        local_numeric_fasta = local_numeric_fasta[local_sufficient_coverage, :]
-        n = local_numeric_fasta.shape[0]
-        k = local_numeric_fasta.shape[1]
-        display_string = 'Working on block %d, shape (%d, %d), covering %d to %d...'
-        display_params = (i, n, k, local_start, local_stop)
-        print(display_string % display_params)
-        embedded_fasta = np.reshape(embedding[local_numeric_fasta, :], newshape=(n, 5*k))
-        reduced_dimensions = TSNE(
-            n_components=ndim, n_iter=5000, random_state=0
-        ).fit_transform(embedded_fasta)
-        columns = ['d%d' % (j+1) for j in range(ndim)]
-        ids = pd.DataFrame({
-            'sequence_id': index[local_sufficient_coverage],
-            'block': n*[i]
-        }).reset_index()
-        rd_df = pd.DataFrame(reduced_dimensions, columns=columns).reset_index()
-        df = pd.concat([ids, rd_df], axis=1).drop(columns='index')
-        reduced_dimension_dfs.append(df)
-        
-        i += 1
-        local_start += stride
-        local_stop += stride
-
+    arguments = zip(nblocks*[numeric_fasta], starts, stops, nblocks*[index], range(nblocks))
+    pool = Pool(processes=ncpu)
+    reduced_dimension_dfs = pool.map(embed_and_reduce_dimensions, arguments)
+    print('Done all blocks!')
+    pool.close()
+    
     df = pd.concat(reduced_dimension_dfs, axis=0)
     return df, info_json
 
 
-def embed_and_reduce_dimensions_io(input_fasta, output_csv, output_json, ndim=2):
+def embed_and_reduce_all_dimensions_io(input_fasta, output_csv, output_json):
     records = SeqIO.parse(input_fasta, 'fasta')
-    df, info_json = embed_and_reduce_dimensions(records, ndim)
+    df, info_json = embed_and_reduce_all_dimensions(records)
     df.to_csv(output_csv, index_label='id')
     with open(output_json, 'w') as json_file:
         json.dump(info_json, json_file, indent=2)
@@ -136,7 +134,7 @@ def cluster_blocks(dr_df, ndim):
     return dr_df
 
 
-def cluster_blocks_io(input_csv, output_csv, ndim):
+def cluster_blocks_io(input_csv, output_csv, ndim=2):
     dr_df = pd.read_csv(input_csv)
     cluster_blocks(dr_df, ndim).to_csv(output_csv)
     
@@ -183,7 +181,7 @@ def obtain_consensus_io(input_csv, input_fasta, input_json, output_fasta):
     SeqIO.write(contigs, output_fasta, 'fasta')
 
 
-def superreads_to_haplotypes(superreads):
+def superreads_to_haplotypes(superreads, max_haplotypes=10):
     blocks = OrderedDict()
     block_sizes = Counter()
     number_of_blocks = 0
@@ -210,7 +208,8 @@ def superreads_to_haplotypes(superreads):
     records = []
     haplotype_length = len(blocks[0][0]['bp'].seq)
     total_size = 0
-    while no_empty_block:
+    num_haplotypes = 0
+    while no_empty_block and num_haplotypes < max_haplotypes:
         first_block_sizes = [item['size'] for item in blocks[0]]
         max_size = max(first_block_sizes)
         max_index = first_block_sizes.index(max_size)
@@ -246,6 +245,7 @@ def superreads_to_haplotypes(superreads):
             id='haplotype-%d_size-%d' % (len(records)+1, haplotype_size),
             description=''
         )
+        num_haplotypes += 1
         records.append(new_record)
         total_size += haplotype_size
     for record in records:        
