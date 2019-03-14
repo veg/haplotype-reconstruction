@@ -8,7 +8,6 @@
 *.tar.gz
 *.bam
 *.fna
-*.json
 shorah/
 *.fas
 *.fai
@@ -21,3 +20,9 @@ savage-tests/
 .DS_Store
 .snakemake
 messages.log*
+__pycache__
+node_modules
+yarn.lock
+package-lock.json
+.Rhistory
+Rplots.pdf
