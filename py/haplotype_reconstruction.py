@@ -98,11 +98,11 @@ def embed_and_reduce_all_dimensions(records, overlap_fraction=.5, ncpu=20):
     info_json['local_starts'] = [int(i) for i in starts]
     info_json['local_stops'] = [int(i) for i in stops]
     arguments = zip(nblocks*[numeric_fasta], starts, stops, nblocks*[index], range(nblocks))
+    print('Processing %d blocks... pool opened.' % nblocks) 
     pool = Pool(processes=ncpu)
     reduced_dimension_dfs = pool.map(embed_and_reduce_dimensions, arguments)
     print('Done all blocks!')
     pool.close()
-    
     df = pd.concat(reduced_dimension_dfs, axis=0)
     return df, info_json
 

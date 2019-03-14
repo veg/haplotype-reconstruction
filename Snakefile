@@ -43,7 +43,7 @@ rule extract_lanl_genome:
 rule extract_gene:
   input:
     reference="input/references/{gene}.fasta",
-    genome="output/lanl/{lanl_id}/genome.fasta"
+    genome=rules.extract_lanl_genome.output[0]
   output:
     sam="output/lanl/{lanl_id}/{gene}/sequence.sam",
     fasta="output/lanl/{lanl_id}/{gene}/sequence.fasta"
@@ -55,7 +55,7 @@ rule extract_gene:
 
 rule align_simulated:
   input:
-    reference="input/references/{gene}.fasta",
+    reference=rules.extract_gene.input.reference,
     target=rules.extract_gene.output.fasta
   output:
     unaligned="output/{simulated_dataset}/{gene}/unaligned.fasta",
@@ -68,7 +68,7 @@ rule align_simulated:
 
 rule amplicon_simulation:
   input:
-    "output/lanl/{lanl_id}/{gene}/sequence.fasta"
+    rules.extract_gene.output.fasta
   output:
     "output/lanl/{lanl_id}/{gene}/reads.fastq"
   shell:
@@ -95,7 +95,7 @@ rule simulate_amplicon_dataset:
 
 rule wgs_simulation:
   input:
-    "output/lanl/{lanl_id}/genome.fasta"
+    rules.extract_lanl_genome.output[0]
   output:
     "output/lanl/{lanl_id}/wgs.fastq"
   shell:
@@ -144,7 +144,7 @@ rule situate_intrahost_data:
 
 rule qfilt:
   input:
-    "output/{dataset}/reads.fastq"
+    rules.situate_intrahost_data.output[0]
   output:
     fasta="output/{dataset}/qfilt/qc.fasta",
     json="output/{dataset}/qfilt/qc.json",
@@ -163,7 +163,7 @@ rule qfilt_454:
 
 rule fastp:
   input:
-    "output/{dataset}/reads.fastq"
+    rules.situate_intrahost_data.output[0]
   output:
     fastq="output/{dataset}/fastp/qc.fastq",
     json="output/{dataset}/fastp/qc.json",
@@ -173,7 +173,7 @@ rule fastp:
 
 rule trimmomatic:
   input:
-    "output/{dataset}/reads.fastq"
+    rules.situate_intrahost_data.output[0]
   output:
     "output/{dataset}/trimmomatic/qc.fastq"
   shell:
@@ -183,7 +183,7 @@ rule trimmomatic:
 
 rule bealign:
   input:
-    qc="output/{dataset}/qfilt/qc.fasta",
+    qc=rules.qfilt.output.fasta,
     reference="input/references/{reference}.fasta"
   output:
     bam="output/{dataset}/qfilt/bealign/{reference}/mapped.bam",
@@ -302,14 +302,6 @@ rule abayesqr:
     shell("mv test_ViralSeq.txt {output.viralseq}")
     parse_abayesqr_output(output.viralseq, output.fasta)
 
-rule all_acme_abayesqr:
-  input:
-    expand(
-      "output/{dataset}/qfilt/bealign/{reference}/abayesqr/test_Seq.txt",
-      dataset=ALL_DATASETS,
-      reference=REFERENCES
-    )
-
 # ACME haplotype reconstruction
 
 rule mmvc:
@@ -388,6 +380,14 @@ rule superreads_to_haplotypes:
   run:
     superreads_to_haplotypes_io(input[0], output[0])
 
+rule acme_haplotype_dag:
+  output:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/dag.svg"
+  params:
+    endpoint="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/haplotypes.fasta"
+  shell:
+    "snakemake --dag {params.endpoint} | dot -Tsvg > {output}"
+
 rule haplotypes_and_truth:
   input:
     haplotypes="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/haplotypes.fasta",
@@ -407,98 +407,98 @@ rule dashboard:
   shell:
     "npx webpack --output-path {params.path}"
 
-## Regress Haplo
-#
-#rule regress_haplo_bam_to_variant_calls:
-#  input:
-#    "output/{dataset}/{reference}/sorted.bam",
-#    "output/{dataset}/{reference}/sorted.bam.bai"
-#  output:
-#    "output/{dataset}/{reference}/variant_calls.csv"
-#  script:
-#    "R/regress_haplo/bam_to_variant_calls.R"
-#   
-#rule regress_haplo_variant_calls_to_read_table:
-#  input:
-#    "output/{dataset}/{reference}/sorted.bam",
-#    "output/{dataset}/{reference}/variant_calls.csv",
-#  output:
-#    "output/{dataset}/{reference}/read_table.csv"
-#  script:
-#    "R/regress_haplo/variant_calls_to_read_table.R"
-#
-#rule regress_haplo_read_table_to_loci:
-#  input:
-#    rules.regress_haplo_variant_calls_to_read_table.output[0]
-#  output:
-#    "output/{dataset}/{reference}/loci.csv"
-#  script:
-#    "R/regress_haplo/read_table_to_loci.R"
-#
-#rule regress_haplo_loci_to_haplotypes:
-#  input:
-#    rules.regress_haplo_read_table_to_loci.output[0]
-#  output:
-#    "output/{dataset}/{reference}/h.csv"
-#  script:
-#    "R/regress_haplo/loci_to_haplotypes.R"
-#
-#rule regress_haplo_haplotypes_to_parameters:
-#  input:
-#    rules.regress_haplo_loci_to_haplotypes.output[0]
-#  output:
-#    "output/{dataset}/{reference}/P.csv"
-#  script:
-#    "R/regress_haplo/haplotypes_to_parameters.R"
-#
-#rule regress_haplo_parameters_to_solutions:
-#  input:
-#    rules.regress_haplo_haplotypes_to_parameters.output[0]
-#  output:
-#    "output/{dataset}/{reference}/solutions.csv"
-#  script:
-#    "R/regress_haplo/parameters_to_solutions.R"
-#
-#rule regress_haplo_solutions_to_haplotypes:
-#  input:
-#    rules.regress_haplo_parameters_to_solutions.output[0]
-#  output:
-#    "output/{dataset}/{reference}/final_haplo.csv"
-#  script:
-#    "R/regress_haplo/solutions_to_haplotypes.R"
-#
-#rule regress_haplo_haplotypes_to_fasta:
-#  input:
-#    rules.regress_haplo_bam_to_variant_calls.input[0],
-#    rules.regress_haplo_solutions_to_haplotypes.output[0]
-#  output:
-#    "output/{dataset}/{reference}/final_haplo.fasta"
-#  script:
-#    "R/regress_haplo/haplotypes_to_fasta.R"
-#
-#
-##############
-## EVOLUTION #
-##############
-#
-#rule concatenate:
-#  input:
-#    expand("output/{dataset}/{{reference}}/full/final_haplo.fasta", dataset=ACCESSION_NUMBERS)
-#  output:
-#    "output/{reference}/unaligned.fasta"
-#  params:
-#    lambda wildcards: ' '.join(["output/%s/%s/haplotypes/final_haplo.fasta" % (accession, wildcards.reference) for accession in ACCESSION_NUMBERS])
-#  shell:
-#    "cat {params} > {output}"
-#
-#rule alignment:
-#  input:
-#    rules.concatenate.output[0]
-#  output:
-#    "output/{reference}/aligned.fasta"
-#  shell:
-#    "mafft {input} > {output}"
-#
+# Regress Haplo
+
+rule regress_haplo_bam_to_variant_calls:
+  input:
+    "output/{dataset}/{reference}/sorted.bam",
+    "output/{dataset}/{reference}/sorted.bam.bai"
+  output:
+    "output/{dataset}/{reference}/variant_calls.csv"
+  script:
+    "R/regress_haplo/bam_to_variant_calls.R"
+   
+rule regress_haplo_variant_calls_to_read_table:
+  input:
+    "output/{dataset}/{reference}/sorted.bam",
+    "output/{dataset}/{reference}/variant_calls.csv",
+  output:
+    "output/{dataset}/{reference}/read_table.csv"
+  script:
+    "R/regress_haplo/variant_calls_to_read_table.R"
+
+rule regress_haplo_read_table_to_loci:
+  input:
+    rules.regress_haplo_variant_calls_to_read_table.output[0]
+  output:
+    "output/{dataset}/{reference}/loci.csv"
+  script:
+    "R/regress_haplo/read_table_to_loci.R"
+
+rule regress_haplo_loci_to_haplotypes:
+  input:
+    rules.regress_haplo_read_table_to_loci.output[0]
+  output:
+    "output/{dataset}/{reference}/h.csv"
+  script:
+    "R/regress_haplo/loci_to_haplotypes.R"
+
+rule regress_haplo_haplotypes_to_parameters:
+  input:
+    rules.regress_haplo_loci_to_haplotypes.output[0]
+  output:
+    "output/{dataset}/{reference}/P.csv"
+  script:
+    "R/regress_haplo/haplotypes_to_parameters.R"
+
+rule regress_haplo_parameters_to_solutions:
+  input:
+    rules.regress_haplo_haplotypes_to_parameters.output[0]
+  output:
+    "output/{dataset}/{reference}/solutions.csv"
+  script:
+    "R/regress_haplo/parameters_to_solutions.R"
+
+rule regress_haplo_solutions_to_haplotypes:
+  input:
+    rules.regress_haplo_parameters_to_solutions.output[0]
+  output:
+    "output/{dataset}/{reference}/final_haplo.csv"
+  script:
+    "R/regress_haplo/solutions_to_haplotypes.R"
+
+rule regress_haplo_haplotypes_to_fasta:
+  input:
+    rules.regress_haplo_bam_to_variant_calls.input[0],
+    rules.regress_haplo_solutions_to_haplotypes.output[0]
+  output:
+    "output/{dataset}/{reference}/final_haplo.fasta"
+  script:
+    "R/regress_haplo/haplotypes_to_fasta.R"
+
+
+#############
+# EVOLUTION #
+#############
+
+rule concatenate:
+  input:
+    expand("output/{dataset}/{{qc}}/{{read_mapper}}/{{reference}}/{{haplotyper}}/haplotypes.fasta", dataset=ACCESSION_NUMBERS)
+  output:
+    "output/evolution/qc-{qc}_rm-{read_mapper}_ht-{haplotyper}/{reference}_unaligned.fasta"
+  params:
+    lambda wildcards: ' '.join(["output/%s/%s/haplotypes/final_haplo.fasta" % (accession, wildcards.reference) for accession in ACCESSION_NUMBERS])
+  shell:
+    "cat {params} > {output}"
+
+rule alignment:
+  input:
+    rules.concatenate.output[0]
+  output:
+    "output/{reference}/aligned.fasta"
+  shell:
+    "mafft {input} > {output}"
+
 #rule recombination_screening:
 #  input:
 #    rules.alignment.output[0]
