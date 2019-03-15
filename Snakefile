@@ -23,7 +23,7 @@ RECONSTRUCTION_DATASETS = [
   "sergei1"
 ]
 ALL_DATASETS = ACCESSION_NUMBERS + SIMULATED_DATASETS + RECONSTRUCTION_DATASETS
-REFERENCES = ["env_C2V5", "gag_p24", "pr", "rt"]
+REFERENCES = ["nef", "vpr", "rev", "vif", "pol", "prrt", "rt", "pr", "gag", "int", "tat"]
 HYPHY_PATH = "/Users/stephenshank/Software/lib/hyphy"
 
 ##################
@@ -132,7 +132,7 @@ def situate_input(wildcards):
     return "output/%s/wgs.fastq" % dataset
   return "input/reconstruction/%s.fastq" % dataset
 
-rule situate_intrahost_data:
+rule situate_data:
   input:
     situate_input
   output:
@@ -144,12 +144,18 @@ rule situate_intrahost_data:
 
 rule qfilt:
   input:
-    rules.situate_intrahost_data.output[0]
+    rules.situate_data.output[0]
   output:
     fasta="output/{dataset}/qfilt/qc.fasta",
     json="output/{dataset}/qfilt/qc.json",
+    html="output/{dataset}/reads_fastqc.html"
+  params:
+    dir="output/{dataset}"
   shell:
-    "qfilt -Q {input} -q 15 -l 50 -P - -R 8 -j >> {output.fasta} 2>> {output.json}"
+    """
+      qfilt -Q {input} -q 20 -l 50 -j >> {output.fasta} 2>> {output.json}
+      fastqc {input} -o {params.dir}
+    """
 
 rule qfilt_454:
   input:
@@ -159,11 +165,11 @@ rule qfilt_454:
     fasta="output/454/qfilt/qc.fasta",
     json="output/454/qfilt/qc.json"
   shell:
-    "qfilt -F {input.fasta} {input.qual} -q 15 -l 50 -P - -R 8 -j >> {output.fasta} 2>> {output.json}"
+    "qfilt -F {input.fasta} {input.qual} -q 20 -l 50 -j >> {output.fasta} 2>> {output.json}"
 
 rule fastp:
   input:
-    rules.situate_intrahost_data.output[0]
+    rules.situate_data.output[0]
   output:
     fastq="output/{dataset}/fastp/qc.fastq",
     json="output/{dataset}/fastp/qc.json",
@@ -173,7 +179,7 @@ rule fastp:
 
 rule trimmomatic:
   input:
-    rules.situate_intrahost_data.output[0]
+    rules.situate_data.output[0]
   output:
     "output/{dataset}/trimmomatic/qc.fastq"
   shell:
@@ -226,6 +232,16 @@ rule sort_and_index:
       bam2msa {output.bam} {output.fasta}
       samtools index {output.bam}
     """
+
+rule qualimap:
+  input:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.bam"
+  output:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/qualimapReport.html"
+  params:
+    dir="output/{dataset}/{qc}/{read_mapper}/{reference}"
+  shell:
+    "qualimap bamqc -bam {input} -outdir {params.dir}"
 
 rule all_acme_bams:
   input:
