@@ -23,7 +23,7 @@ RECONSTRUCTION_DATASETS = [
   "sergei1"
 ]
 ALL_DATASETS = ACCESSION_NUMBERS + SIMULATED_DATASETS + RECONSTRUCTION_DATASETS
-REFERENCES = ["nef", "vpr", "rev", "vif", "pol", "prrt", "rt", "pr", "gag", "int", "tat"]
+REFERENCES = ["rev", "vif", "pol", "prrt", "rt", "pr", "gag", "int", "tat"] # + ["nef", "vpr"] 
 HYPHY_PATH = "/Users/stephenshank/Software/lib/hyphy"
 
 ##################
@@ -258,7 +258,7 @@ rule regress_haplo_full:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.bam",
     "output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.bam.bai",
   output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/final_haplo.fasta"
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/regress_haplo/haplotypes.fasta"
   script:
     "R/regress_haplo/full_pipeline.R"
 
@@ -288,7 +288,7 @@ rule quasirecomb:
   input:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.bam"
   output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/quasirecomb/output.fasta"
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/quasirecomb/haplotypes.fasta"
   params:
     basedir="output/{dataset}/{qc}/{read_mapper}/{reference}/quasirecomb/"
   shell:
@@ -317,6 +317,14 @@ rule abayesqr:
     shell("mv test_Seq.txt {output.seq}")
     shell("mv test_ViralSeq.txt {output.viralseq}")
     parse_abayesqr_output(output.viralseq, output.fasta)
+
+rule all_abayesqr:
+  input:
+    expand(
+      "output/{dataset}/qfilt/bealign/{reference}/abayesqr/haplotypes.fasta",
+      dataset=ALL_DATASETS,
+      reference=REFERENCES
+    )
 
 # ACME haplotype reconstruction
 
