@@ -153,7 +153,7 @@ rule qfilt:
     dir="output/{dataset}"
   shell:
     """
-      qfilt -Q {input} -q 20 -l 50 -j >> {output.fasta} 2>> {output.json}
+      qfilt -Q {input} -q 15 -l 50 -j >> {output.fasta} 2>> {output.json}
       fastqc {input} -o {params.dir}
     """
 
@@ -216,6 +216,20 @@ rule bwa_map_reads:
     "output/{dataset}/{qc}/bwa/{reference}/mapped.bam"
   shell:
     "bwa mem {input.reference} {input.fastq} > {output}"
+
+rule bowtie2:
+  input:
+    fastq="output/{dataset}/{qc}/qc.fastq",
+    reference="output/references/{reference}.fasta"
+  output:
+    sam="output/{dataset}/{qc}/bowtie2/{reference}/mapped.sam",
+    bam="output/{dataset}/{qc}/bowtie2/{reference}/mapped.bam"
+  shell:
+    """
+      bowtie2-build {input.reference} {wildcards.reference}
+      bowtie2 -x {wildcards.reference} -U {input.fastq} -S {output.sam}
+      samtools view -Sb {output.sam} > {output.bam}
+    """
 
 rule sort_and_index:
   input:
@@ -300,6 +314,28 @@ rule quasirecomb:
       mv quasispecies.fasta {params.basedir}/output.fasta
     """
 
+rule savage:
+  input:
+    fastq="output/{dataset}/{qc}/qc.fastq",
+    reference="input/references/{reference}.fasta"
+  output:
+    "output/{dataset}/{qc}/savage/{reference}/savage/haplotypes.fasta"
+  shell:
+    """
+      export PATH="/home/sshank/Software/anaconda3/envs/savage/bin:$PATH"
+      savage -s {input.fastq} --ref `pwd`/{input.reference} --split 3
+      mv contigs_stage_c.fasta {output}
+      rm -rf stage_* contigs_stage_*.fasta
+    """
+
+rule all_savage:
+  input:
+    expand(
+      "output/{dataset}/fastp/savage/{reference}/savage/haplotypes.fasta",
+      dataset=ALL_DATASETS,
+      reference=REFERENCES
+    )
+
 rule abayesqr:
   input:
     sam="output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.sam",
@@ -332,14 +368,14 @@ rule mmvc:
   input:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.fasta"
   output:
-    json="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/mmvc.json",
-    fasta="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/mmvc.fasta"
+    json="output/{dataset}/{qc}/{read_mapper}/{reference}/mmvc.json",
+    fasta="output/{dataset}/{qc}/{read_mapper}/{reference}/mmvc.fasta"
   shell:
     "mmvc -j {output.json} -f {output.fasta} {input}"
 
 rule embed_and_reduce_dimensions:
   input:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/mmvc.fasta"
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/mmvc.fasta"
   output:
     csv="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/dr.csv",
     json="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/dr.json"

@@ -76,7 +76,7 @@ def embed_and_reduce_dimensions(arguments):
     return df
 
 
-def embed_and_reduce_all_dimensions(records, overlap_fraction=.5, ncpu=20):
+def embed_and_reduce_all_dimensions(records, overlap_fraction=.3, ncpu=20):
     index, numeric_fasta = create_numeric_fasta(records)
     info_json = {
         'local_starts': [],
