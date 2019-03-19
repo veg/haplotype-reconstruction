@@ -265,6 +265,14 @@ rule all_acme_bams:
       reference=REFERENCES
     )
 
+rule all_bowtie_bams:
+  input:
+    expand(
+      "output/{dataset}/fastp/bowtie2/{reference}/sorted.bam",
+      dataset=ALL_DATASETS,
+      reference=REFERENCES
+    )
+
 # Haplotype reconstruction (full pipelines)
 
 rule regress_haplo_full:
@@ -316,15 +324,17 @@ rule quasirecomb:
 
 rule savage:
   input:
-    fastq="output/{dataset}/{qc}/qc.fastq",
+    bam="output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.bam",
     reference="input/references/{reference}.fasta"
   output:
-    "output/{dataset}/{qc}/savage/{reference}/savage/haplotypes.fasta"
+    fastq="output/{dataset}/{qc}/{read_mapper}/{reference}/savage/reads.fastq",
+    fasta="output/{dataset}/{qc}/{read_mapper}/{reference}/savage/haplotypes.fasta"
   shell:
     """
       export PATH="/home/sshank/Software/anaconda3/envs/savage/bin:$PATH"
-      savage -s {input.fastq} --ref `pwd`/{input.reference} --split 3
-      mv contigs_stage_c.fasta {output}
+      bamToFastq -i {input.bam} -fq {output.fastq}
+      savage -s {output.fastq} --ref `pwd`/{input.reference} --split 3 --num_threads 24
+      mv contigs_stage_c.fasta {output.fasta}
       rm -rf stage_* contigs_stage_*.fasta
     """
 
@@ -426,7 +436,7 @@ rule superreads_and_truth:
 
 rule readreduce:
   input:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/mmvc.fasta"
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/mmvc.fasta"
   output:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/haplosuperreads.fasta"
   shell:
@@ -450,14 +460,16 @@ rule acme_haplotype_dag:
 
 rule haplotypes_and_truth:
   input:
-    haplotypes="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/haplotypes.fasta",
+    haplotypes="output/{dataset}/{qc}/{read_mapper}/{reference}/{haplotyper}/haplotypes.fasta",
     truth="output/{dataset}/{reference}/truth.fasta"
   output:
-    fasta="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/truth_and_haplotypes.fasta",
-    json="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/truth_and_haplotypes.json"
-  run:
-    shell("cat {input.truth} {input.haplotypes} > {output.fasta}")
-    evaluate(input.haplotypes, input.truth, output.json)
+    unaligned="output/{dataset}/{qc}/{read_mapper}/{reference}/{haplotyper}/truth_and_haplotypes_unaligned.fasta",
+    aligned="output/{dataset}/{qc}/{read_mapper}/{reference}/{haplotyper}/truth_and_haplotypes.fasta"
+  shell:
+    """
+      cat {input.haplotypes} {input.truth} > {output.unaligned}
+      mafft {output.unaligned} > {output.aligned}
+    """
 
 rule dashboard:
   output:
