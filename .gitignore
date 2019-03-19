@@ -27,3 +27,5 @@ package-lock.json
 .Rhistory
 Rplots.pdf
 snakejob*
+*.bt2
+compartmentalization.json

@@ -15,6 +15,8 @@ from py import parse_abayesqr_output
 
 with open('simulations.json') as simulation_file:
   SIMULATION_INFORMATION = json.load(simulation_file)
+with open('compartmentalization.json') as simulation_file:
+  COMPARTMENT_INFORMATION = json.load(simulation_file)
 ACCESSION_NUMBERS = ['ERS6610%d' % i for i in range(87, 94)]
 SIMULATED_DATASETS = ['simulation_' + dataset for dataset in SIMULATION_INFORMATION.keys()]
 RECONSTRUCTION_DATASETS = [
@@ -23,7 +25,7 @@ RECONSTRUCTION_DATASETS = [
   "sergei1"
 ]
 ALL_DATASETS = ACCESSION_NUMBERS + SIMULATED_DATASETS + RECONSTRUCTION_DATASETS
-REFERENCES = ["rev", "vif", "pol", "prrt", "rt", "pr", "gag", "int", "tat"] # + ["nef", "vpr"] 
+REFERENCES = ["env", "rev", "vif", "pol", "prrt", "rt", "pr", "gag", "int", "tat"] # + ["nef", "vpr"] 
 HYPHY_PATH = "/Users/stephenshank/Software/lib/hyphy"
 
 ##################
@@ -157,13 +159,27 @@ rule qfilt:
       fastqc {input} -o {params.dir}
     """
 
+def fasta_454(wildcards):
+  if wildcards.dataset == 'example_454':
+    return "input/reconstruction/3.GAC.454Reads.fna"
+  head = "input/compartmentalization/"
+  tail = "/".join(wildcards.dataset.split('-'))
+  return head + tail + "/reads.fasta"
+
+def qual_454(wildcards):
+  if wildcards.dataset == 'example_454':
+    return "input/reconstruction/3.GAC.454Reads.qual"
+  head = "input/compartmentalization/"
+  tail = "/".join(wildcards.dataset.split('-'))
+  return head + tail + "/scores.qual"
+
 rule qfilt_454:
   input:
-    fasta="input/reconstruction/3.GAC.454Reads.fna",
-    qual="input/reconstruction/3.GAC.454Reads.qual"
+    fasta=fasta_454,
+    qual=qual_454
   output:
-    fasta="output/454/qfilt/qc.fasta",
-    json="output/454/qfilt/qc.json"
+    fasta="output/{dataset}/qfilt/qc.fasta",
+    json="output/{dataset}/qfilt/qc.json"
   shell:
     "qfilt -F {input.fasta} {input.qual} -q 20 -l 50 -j >> {output.fasta} 2>> {output.json}"
 
