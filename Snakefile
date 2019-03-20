@@ -27,6 +27,36 @@ RECONSTRUCTION_DATASETS = [
 ALL_DATASETS = ACCESSION_NUMBERS + SIMULATED_DATASETS + RECONSTRUCTION_DATASETS
 REFERENCES = ["env", "rev", "vif", "pol", "prrt", "rt", "pr", "gag", "int", "tat"] # + ["nef", "vpr"] 
 HYPHY_PATH = "/Users/stephenshank/Software/lib/hyphy"
+HAPLOTYPERS = ["abayesqr"]
+
+rule dynamics_and_evolution:
+  input:
+    expand(
+      "output/{dataset}/qfilt/bealign/{reference}/{haplotyper}/haplotypes.fasta",
+      dataset=ALL_DATASETS,
+      reference=["env", "gag", "pol"],
+      haplotyper=HAPLOTYPERS
+    ),
+    expand(
+      "output/{dataset}/fastp/bowtie2/{reference}/{haplotyper}/haplotypes.fasta",
+      dataset=ALL_DATASETS,
+      reference=["env", "gag", "pol"],
+      haplotyper=HAPLOTYPERS
+    ),
+    expand(
+      "output/{dataset}/reads_fastqc.html",
+      dataset=ALL_DATASETS
+    ),
+    expand(
+      "output/{dataset}/qfilt/bealign/{reference}/qualimapReport.html",
+      dataset=ALL_DATASETS,
+      reference=["env", "gag", "pol"]
+    ),
+    expand(
+      "output/{dataset}/fastp/bowtie2/{reference}/qualimapReport.html",
+      dataset=ALL_DATASETS,
+      reference=["env", "gag", "pol"]
+    )
 
 ##################
 # RECONSTRUCTION #
@@ -347,7 +377,7 @@ rule savage:
     fasta="output/{dataset}/{qc}/{read_mapper}/{reference}/savage/haplotypes.fasta"
   shell:
     """
-      export PATH="/home/sshank/Software/anaconda3/envs/savage/bin:$PATH"
+      export PATH="/home/sshank/anaconda3/envs/savage/bin:$PATH"
       bamToFastq -i {input.bam} -fq {output.fastq}
       savage -s {output.fastq} --ref `pwd`/{input.reference} --split 3 --num_threads 24
       mv contigs_stage_c.fasta {output.fasta}

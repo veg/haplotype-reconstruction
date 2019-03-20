@@ -15,7 +15,7 @@ for x in os.walk('input/compartmentalization/'):
         new_quality = directory + "/scores.qual"
         subprocess.run(["mv", reads, new_reads])
         subprocess.run(["mv", quality, new_quality])
-        datasets.append('-'.join(directory.split('/')[1:]))
+        datasets.append('-'.join(directory.replace('CSF-PELLET','CSF_PELLET').split('/')[2:]))
 
 with open('compartmentalization.json', 'w') as json_file:
     json.dump(datasets, json_file, indent=2)
