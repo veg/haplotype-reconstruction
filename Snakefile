@@ -25,7 +25,8 @@ RECONSTRUCTION_DATASETS = [
   "sergei1"
 ]
 ALL_DATASETS = ACCESSION_NUMBERS + SIMULATED_DATASETS + RECONSTRUCTION_DATASETS
-REFERENCES = ["env", "rev", "vif", "pol", "prrt", "rt", "pr", "gag", "int", "tat"] # + ["nef", "vpr"] 
+ALL_REFERENCES = ["env", "rev", "vif", "pol", "prrt", "rt", "pr", "gag", "int", "tat"] # + ["nef", "vpr"] 
+REFERENCE_SUBSET = ["env", "pol", "gag"]
 HYPHY_PATH = "/Users/stephenshank/Software/lib/hyphy"
 HAPLOTYPERS = ["abayesqr"]
 
@@ -308,7 +309,7 @@ rule all_acme_bams:
     expand(
       "output/{dataset}/qfilt/bealign/{reference}/sorted.bam",
       dataset=ALL_DATASETS,
-      reference=REFERENCES
+      reference=ALL_REFERENCES
     )
 
 rule all_bowtie_bams:
@@ -316,7 +317,7 @@ rule all_bowtie_bams:
     expand(
       "output/{dataset}/fastp/bowtie2/{reference}/sorted.bam",
       dataset=ALL_DATASETS,
-      reference=REFERENCES
+      reference=ALL_REFERENCES
     )
 
 # Haplotype reconstruction (full pipelines)
@@ -335,7 +336,7 @@ rule all_acme_regress_haplo:
     expand(
       "output/{dataset}/qfilt/bealign/{reference}/final_haplo.fasta",
       dataset=ALL_DATASETS,
-      reference=REFERENCES
+      reference=ALL_REFERENCES
     )
 
 rule haploclique:
@@ -389,7 +390,7 @@ rule all_savage:
     expand(
       "output/{dataset}/fastp/savage/{reference}/savage/haplotypes.fasta",
       dataset=ALL_DATASETS,
-      reference=REFERENCES
+      reference=ALL_REFERENCES
     )
 
 rule abayesqr:
@@ -415,7 +416,15 @@ rule all_abayesqr:
     expand(
       "output/{dataset}/qfilt/bealign/{reference}/abayesqr/haplotypes.fasta",
       dataset=ALL_DATASETS,
-      reference=REFERENCES
+      reference=ALL_REFERENCES
+    )
+
+rule abayesqr_intrahost:
+  input:
+    expand(
+      "output/{dataset}/qfilt/bealign/{reference}/abayesqr/haplotypes.fasta",
+      dataset=ACCESSION_NUMBERS,
+      reference=REFERENCE_SUBSET
     )
 
 # ACME haplotype reconstruction
