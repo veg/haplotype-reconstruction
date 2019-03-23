@@ -91,8 +91,8 @@ rule align_simulated:
     reference=rules.extract_gene.input.reference,
     target=rules.extract_gene.output.fasta
   output:
-    unaligned="output/{simulated_dataset}/{gene}/unaligned.fasta",
-    aligned="output/{simulated_dataset}/{gene}/aligned.fasta"
+    unaligned="output/amplicon/{simulated_dataset}/{gene}/unaligned.fasta",
+    aligned="output/amplicon/{simulated_dataset}/{gene}/aligned.fasta"
   shell:
     """
       cat {input.target} {input.reference} > {output.unaligned}
@@ -610,11 +610,14 @@ rule regress_haplo_haplotypes_to_fasta:
 
 rule concatenate:
   input:
-    expand("output/{dataset}/{{qc}}/{{read_mapper}}/{{reference}}/{{haplotyper}}/haplotypes.fasta", dataset=ACCESSION_NUMBERS)
+    expand("output/{dataset}/qfilt/bealign/{{reference}}/{{haplotyper}}/haplotypes.fasta", dataset=ACCESSION_NUMBERS)
   output:
-    "output/evolution/qc-{qc}_rm-{read_mapper}_ht-{haplotyper}/{reference}_unaligned.fasta"
+    "output/evolution/{qc}/{read_mapper}/{reference}/{haplotyper}/unaligned.fasta"
   params:
-    lambda wildcards: ' '.join(["output/%s/%s/haplotypes/final_haplo.fasta" % (accession, wildcards.reference) for accession in ACCESSION_NUMBERS])
+    lambda wildcards: ' '.join([
+      "output/%s/qfilt/bealign/%s/%s/haplotypes.fasta" % 
+      (accession, wildcards.reference, wildcards.haplotyper) for accession in ACCESSION_NUMBERS
+    ])
   shell:
     "cat {params} > {output}"
 
@@ -622,9 +625,17 @@ rule alignment:
   input:
     rules.concatenate.output[0]
   output:
-    "output/{reference}/aligned.fasta"
+    "output/evolution/{qc}/{read_mapper}/{reference}/{haplotyper}/aligned.fasta"
   shell:
     "mafft {input} > {output}"
+
+rule tree:
+  input:
+    rules.alignment.output[0]
+  output:
+    "output/evolution/{qc}/{read_mapper}/{reference}/{haplotyper}/tree.new"
+  shell:
+    "FastTree -nt {input} > {output}"
 
 #rule recombination_screening:
 #  input:
