@@ -22,7 +22,8 @@ SIMULATED_DATASETS = ['simulation_' + dataset for dataset in SIMULATION_INFORMAT
 RECONSTRUCTION_DATASETS = [
   "93US141_100k_14-159320-1GN-0_S16_L001_R1_001",
   "PP1L_S45_L001_R1_001",
-  "sergei1"
+  "sergei1",
+  "FiveVirusMixIllumina_1"
 ]
 ALL_DATASETS = ACCESSION_NUMBERS + SIMULATED_DATASETS + RECONSTRUCTION_DATASETS
 ALL_REFERENCES = ["env", "rev", "vif", "pol", "prrt", "rt", "pr", "gag", "int", "tat"] # + ["nef", "vpr"] 
@@ -152,6 +153,21 @@ rule simulate_wgs_dataset:
     fasta="output/simulation_{simulated_dataset}/truth.fasta"
   run:
     simulate_wgs_dataset(wildcards.simulated_dataset, output.fastq, output.fasta)
+
+rule all_lanl_genes:
+  input:
+    lanl="input/LANL-HIV.fasta",
+    reference="input/references/{reference}.fasta"
+  output:
+    sam="output/lanl/{reference}.sam",
+    fasta="output/lanl/{reference}.fasta",
+    newick="output/lanl/{reference}.new"
+  shell:
+    """
+      bealign -r {input.reference} {input.lanl} {output.sam}
+      bam2msa {output.sam} {output.fasta}
+      FastTree -nt {output.fasta} > {output.newick}
+    """
 
 # Situating other data
 
@@ -366,8 +382,16 @@ rule quasirecomb:
       mv support/* {params.basedir}
       rmdir support
       mv piDist.txt {params.basedir}
-      mv quasispecies.fasta {params.basedir}/output.fasta
+      mv quasispecies.fasta {params.basedir}/haplotypes.fasta
     """
+
+rule all_quasirecomb:
+  input:
+    expand(
+      "output/{dataset}/qfilt/bealign/{reference}/quasirecomb/haplotypes.fasta",
+      dataset=ALL_DATASETS,
+      reference=ALL_REFERENCES
+    )
 
 rule savage:
   input:
@@ -388,7 +412,7 @@ rule savage:
 rule all_savage:
   input:
     expand(
-      "output/{dataset}/fastp/savage/{reference}/savage/haplotypes.fasta",
+      "output/{dataset}/qfilt/bealign/{reference}/savage/haplotypes.fasta",
       dataset=ALL_DATASETS,
       reference=ALL_REFERENCES
     )
