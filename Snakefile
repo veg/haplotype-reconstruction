@@ -243,6 +243,8 @@ rule fastp:
     fastq="output/{dataset}/fastp/qc.fastq",
     json="output/{dataset}/fastp/qc.json",
     html="output/{dataset}/fastp/qc.html"
+  conda:
+    "envs/ngs.yml"
   shell:
     "fastp -A -q 8 -i {input} -o {output.fastq} -j {output.json} -h {output.html}"
 
@@ -268,7 +270,7 @@ rule bealign:
   shell:
     "bealign -r {input.reference} -e 0.5 -m HIV_BETWEEN_F -D {output.discards} -R {input.qc} {output.bam}"
 
-rule bwa_reference_index:
+rule situate_references:
   input:
     "input/references/{reference}.fasta"
   output:
@@ -276,7 +278,6 @@ rule bwa_reference_index:
   shell:
     """
       cp {input} {output}
-      bwa index {output}
     """
 
 rule bwa_map_reads:
@@ -286,7 +287,10 @@ rule bwa_map_reads:
   output:
     "output/{dataset}/{qc}/bwa/{reference}/mapped.bam"
   shell:
-    "bwa mem {input.reference} {input.fastq} > {output}"
+    """
+      bwa index {input.reference}
+      bwa mem {input.reference} {input.fastq} > {output}
+    """
 
 rule bowtie2:
   input:
@@ -295,10 +299,14 @@ rule bowtie2:
   output:
     sam="output/{dataset}/{qc}/bowtie2/{reference}/mapped.sam",
     bam="output/{dataset}/{qc}/bowtie2/{reference}/mapped.bam"
+  params:
+    lambda wildcards: "output/references/%s" % wildcards.reference
+  conda:
+    "envs/ngs.yml"
   shell:
     """
-      bowtie2-build {input.reference} {wildcards.reference}
-      bowtie2 -x {wildcards.reference} -U {input.fastq} -S {output.sam}
+      bowtie2-build {input.reference} {params}
+      bowtie2 -x {params} -U {input.fastq} -S {output.sam}
       samtools view -Sb {output.sam} > {output.bam}
     """
 
@@ -327,6 +335,8 @@ rule qualimap:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/qualimapReport.html"
   params:
     dir="output/{dataset}/{qc}/{read_mapper}/{reference}"
+  conda:
+    "envs/reporting.yml"
   shell:
     "qualimap bamqc -bam {input} -outdir {params.dir}"
 
@@ -423,15 +433,15 @@ rule savage:
     fastq="output/{dataset}/{qc}/{read_mapper}/{reference}/savage/reads.fastq",
     fasta="output/{dataset}/{qc}/{read_mapper}/{reference}/savage/haplotypes.fasta"
   params:
-    outdir="output/{dataset}/{qc}/{read_mapper}/{reference}/savage"
-  threads:
-    12
+    outdir="output/{dataset}/{qc}/{read_mapper}/{reference}/savage",
+    intermediate="output/{dataset}/{qc}/{read_mapper}/{reference}/savage/contigs_stage_c.fasta"
   conda:
     "envs/savage.yml"
   shell:
     """
       bamToFastq -i {input.bam} -fq {output.fastq}
-      savage -s {output.fastq} --ref `pwd`/{input.reference} --split 3 --num_threads {threads} --outdir {params.outdir}
+      savage -s {output.fastq} --ref `pwd`/{input.reference} --split 3 --num_threads 12 --outdir {params.outdir}
+      mv {params.intermediate} {output.fasta}
     """
 
 rule all_savage:
