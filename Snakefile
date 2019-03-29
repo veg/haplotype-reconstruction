@@ -11,6 +11,7 @@ from py import obtain_consensus_io
 from py import superreads_to_haplotypes_io
 from py import evaluate
 from py import parse_abayesqr_output
+from py import pairwise_distance_csv
 
 
 with open('simulations.json') as simulation_file:
@@ -107,6 +108,8 @@ rule amplicon_simulation:
     rules.extract_gene.output.fasta
   output:
     "output/lanl/{lanl_id}/{gene}/reads.fastq"
+  conda:
+    "envs/ngs.yml"
   shell:
     """
       art_illumina -ss HS25 -i {input} -l 120 -s 50 -c 15000 -o {output}
@@ -246,7 +249,7 @@ rule fastp:
   conda:
     "envs/ngs.yml"
   shell:
-    "fastp -A -q 8 -i {input} -o {output.fastq} -j {output.json} -h {output.html}"
+    "fastp -A -q 15 -i {input} -o {output.fastq} -j {output.json} -h {output.html}"
 
 rule trimmomatic:
   input:
@@ -410,7 +413,7 @@ rule quasirecomb:
     "envs/quasirecomb.yml"
   shell:
     """
-      java -jar ~/QuasiRecomb.jar -i {input}
+      java -jar ~/QuasiRecomb.jar -conservative -i {input}
       mv support/* {params.basedir}
       rmdir support
       mv piDist.txt {params.basedir}
@@ -486,7 +489,7 @@ rule abayesqr_intrahost:
       reference=REFERENCE_SUBSET
     )
 
-# ACME haplotype reconstruction
+# VEG haplotype reconstruction
 
 rule mmvc:
   input:
@@ -496,6 +499,16 @@ rule mmvc:
     fasta="output/{dataset}/{qc}/{read_mapper}/{reference}/mmvc.fasta"
   shell:
     "mmvc -j {output.json} -f {output.fasta} {input}"
+
+rule readreduce:
+  input:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/mmvc.fasta"
+  output:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/haplosuperreads.fasta"
+  shell:
+    "readreduce -a resolve -l 30 -s 16 -o {output} {input}"
+
+# ACME haplotype reconstruction
 
 rule embed_and_reduce_dimensions:
   input:
@@ -548,14 +561,6 @@ rule superreads_and_truth:
       mafft {output.unaligned} > {output.aligned}
     """
 
-rule readreduce:
-  input:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/mmvc.fasta"
-  output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/haplosuperreads.fasta"
-  shell:
-    "readreduce -a resolve -l 30 -s 16 -o {output} {input}"
-
 rule superreads_to_haplotypes:
   input:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/superreads.fasta"
@@ -578,12 +583,23 @@ rule haplotypes_and_truth:
     truth="output/{dataset}/{reference}/truth.fasta"
   output:
     unaligned="output/{dataset}/{qc}/{read_mapper}/{reference}/{haplotyper}/truth_and_haplotypes_unaligned.fasta",
-    aligned="output/{dataset}/{qc}/{read_mapper}/{reference}/{haplotyper}/truth_and_haplotypes.fasta"
-  shell:
-    """
-      cat {input.haplotypes} {input.truth} > {output.unaligned}
-      mafft {output.unaligned} > {output.aligned}
-    """
+    aligned="output/{dataset}/{qc}/{read_mapper}/{reference}/{haplotyper}/truth_and_haplotypes.fasta",
+    csv="output/{dataset}/{qc}/{read_mapper}/{reference}/{haplotyper}/truth_and_haplotypes.csv"
+  run:
+    shell("cat {input.haplotypes} {input.truth} > {output.unaligned}")
+    shell("mafft {output.unaligned} > {output.aligned}")
+    pairwise_distance_csv(output.aligned, output.csv)
+
+rule haplotypes_and_truth_heatmap:
+  input:
+    rules.haplotypes_and_truth.output.csv
+  output:
+    png="output/{dataset}/{qc}/{read_mapper}/{reference}/{haplotyper}/truth_and_haplotypes.png"
+  conda:
+    "envs/tidyverse.yml"
+  script:
+    "R/truth_heatmap.R"
+    
 
 rule dashboard:
   output:
