@@ -127,3 +127,10 @@ def pairwise_distance_csv(fasta_filename, csv_filename):
         'distance': distances,
     }).to_csv(csv_filename)
 
+
+def add_subtype_information(input_csv, output_csv):
+    df = pd.read_csv(input_csv)
+    df['Subtype1'] = df['ID1'].apply(lambda row: row.split('.')[0])
+    df['Subtype2'] = df['ID2'].apply(lambda row: row.split('.')[0])
+    df.to_csv(output_csv, index=False)
+

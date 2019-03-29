@@ -12,6 +12,7 @@ from py import superreads_to_haplotypes_io
 from py import evaluate
 from py import parse_abayesqr_output
 from py import pairwise_distance_csv
+from py import add_subtype_information
 
 
 with open('simulations.json') as simulation_file:
@@ -168,13 +169,41 @@ rule all_lanl_genes:
   output:
     sam="output/lanl/{reference}.sam",
     fasta="output/lanl/{reference}.fasta",
-    newick="output/lanl/{reference}.new"
+    csv=temp("output/lanl/{reference}-no_subtypes.csv")
+  conda:
+    "envs/acme.yml"
   shell:
     """
       bealign -r {input.reference} {input.lanl} {output.sam}
       bam2msa {output.sam} {output.fasta}
-      FastTree -nt {output.fasta} > {output.newick}
+      tn93 -t 1 -o {output.csv} {output.fasta}
     """
+
+rule distances_for_simulating:
+  input:
+    rules.all_lanl_genes.output.csv
+  output:
+    "output/lanl/{reference}.csv"
+  run:
+    add_subtype_information(input[0], output[0])
+
+rule genome_distances:
+  input:
+    "input/LANL-HIV-aligned.fasta"
+  output:
+    temp("output/lanl/distances-no_subtypes.csv")
+  conda:
+    "envs/acme.yml"
+  shell:
+    "tn93 -t 1 -o {output} {input}"
+
+rule genome_distances_with_subtypes:
+  input:
+    rules.genome_distances.output[0]
+  output:
+    "output/lanl/distances.csv"
+  run:
+    add_subtype_information(input[0], output[0])
 
 # Situating other data
 
