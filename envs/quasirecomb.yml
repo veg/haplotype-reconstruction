@@ -1,8 +1,0 @@
-name: quasirecomb
-channels:
-  - bioconda
-  - defaults
-dependencies:
-  - java-jdk=7.0.91=1
-prefix: /home/sshank/Software/anaconda3/envs/quasirecomb
-

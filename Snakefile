@@ -83,8 +83,6 @@ rule extract_gene:
   output:
     sam="output/lanl/{lanl_id}/{gene}/sequence.sam",
     fasta="output/lanl/{lanl_id}/{gene}/sequence.fasta"
-  conda:
-    "envs/acme.yml"
   shell:
     """
       bealign -r {input.reference} {input.genome} {output.sam}
@@ -109,8 +107,6 @@ rule amplicon_simulation:
     rules.extract_gene.output.fasta
   output:
     "output/lanl/{lanl_id}/{gene}/reads.fastq"
-  conda:
-    "envs/ngs.yml"
   shell:
     """
       art_illumina -ss HS25 -i {input} -l 120 -s 50 -c 15000 -o {output}
@@ -138,8 +134,6 @@ rule wgs_simulation:
     rules.extract_lanl_genome.output[0]
   output:
     "output/lanl/{lanl_id}/wgs.fastq"
-  conda:
-    "envs/ngs.yml"
   shell:
     """
       art_illumina -ss HS25 -i {input} -l 120 -s 50 -c 150000 -o {output}
@@ -170,8 +164,6 @@ rule all_lanl_genes:
     sam="output/lanl/{reference}.sam",
     fasta="output/lanl/{reference}.fasta",
     csv=temp("output/lanl/{reference}-no_subtypes.csv")
-  conda:
-    "envs/acme.yml"
   shell:
     """
       bealign -r {input.reference} {input.lanl} {output.sam}
@@ -192,8 +184,6 @@ rule genome_distances:
     "input/LANL-HIV-aligned.fasta"
   output:
     temp("output/lanl/distances-no_subtypes.csv")
-  conda:
-    "envs/acme.yml"
   shell:
     "tn93 -t 1 -o {output} {input}"
 
@@ -236,8 +226,6 @@ rule qfilt:
     html="output/{dataset}/reads_fastqc.html"
   params:
     dir="output/{dataset}"
-  conda:
-    "envs/acme.yml"
   shell:
     """
       qfilt -Q {input} -q 15 -l 50 -j >> {output.fasta} 2>> {output.json}
@@ -275,8 +263,6 @@ rule fastp:
     fastq="output/{dataset}/fastp/qc.fastq",
     json="output/{dataset}/fastp/qc.json",
     html="output/{dataset}/fastp/qc.html"
-  conda:
-    "envs/ngs.yml"
   shell:
     "fastp -A -q 15 -i {input} -o {output.fastq} -j {output.json} -h {output.html}"
 
@@ -297,8 +283,6 @@ rule bealign:
   output:
     bam="output/{dataset}/qfilt/bealign/{reference}/mapped.bam",
     discards="output/{dataset}/qfilt/bealign/{reference}/discards.fasta"
-  conda:
-    "envs/acme.yml"
   shell:
     "bealign -r {input.reference} -e 0.5 -m HIV_BETWEEN_F -D {output.discards} -R {input.qc} {output.bam}"
 
@@ -333,8 +317,6 @@ rule bowtie2:
     bam="output/{dataset}/{qc}/bowtie2/{reference}/mapped.bam"
   params:
     lambda wildcards: "output/references/%s" % wildcards.reference
-  conda:
-    "envs/ngs.yml"
   shell:
     """
       bowtie2-build {input.reference} {params}
@@ -350,8 +332,6 @@ rule sort_and_index:
     sam="output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.sam",
     fasta="output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.fasta",
     index="output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.bam.bai"
-  conda:
-    "envs/ngs.yml"
   shell:
     """
       samtools sort {input} > {output.bam}
@@ -367,8 +347,6 @@ rule qualimap:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/qualimapReport.html"
   params:
     dir="output/{dataset}/{qc}/{read_mapper}/{reference}"
-  conda:
-    "envs/reporting.yml"
   shell:
     "qualimap bamqc -bam {input} -outdir {params.dir}"
 
@@ -396,8 +374,6 @@ rule regress_haplo_full:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.bam.bai",
   output:
     temp("output/{dataset}/{qc}/{read_mapper}/{reference}/regress_haplo/final_haplo.fasta")
-  conda:
-    "envs/regress-haplo.yml"
   script:
     "R/regress_haplo/full_pipeline.R"
 
@@ -437,24 +413,19 @@ rule quasirecomb:
   output:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/quasirecomb/haplotypes.fasta"
   params:
-    basedir="output/{dataset}/{qc}/{read_mapper}/{reference}/quasirecomb/"
-  conda:
-    "envs/quasirecomb.yml"
+    basedir="output/{dataset}/{qc}/{read_mapper}/{reference}/quasirecomb"
   shell:
     """
-      java -jar ~/QuasiRecomb.jar -conservative -i {input}
-      mv support/* {params.basedir}
-      rmdir support
-      mv piDist.txt {params.basedir}
-      mv quasispecies.fasta {params.basedir}/haplotypes.fasta
+      java -jar ~/QuasiRecomb.jar -conservative -o {params.basedir} -i {input}
+      mv {params.basedir}/quasispecies.fasta {params.basedir}/haplotypes.fasta
     """
 
 rule all_quasirecomb:
   input:
     expand(
-      "output/{dataset}/qfilt/bealign/{reference}/quasirecomb/haplotypes.fasta",
+      "output/{dataset}/fastp/bowtie2/{reference}/quasirecomb/haplotypes.fasta",
       dataset=ALL_DATASETS,
-      reference=ALL_REFERENCES
+      reference=REFERENCE_SUBSET
     )
 
 rule savage:
@@ -467,8 +438,6 @@ rule savage:
   params:
     outdir="output/{dataset}/{qc}/{read_mapper}/{reference}/savage",
     intermediate="output/{dataset}/{qc}/{read_mapper}/{reference}/savage/contigs_stage_c.fasta"
-  conda:
-    "envs/savage.yml"
   shell:
     """
       bamToFastq -i {input.bam} -fq {output.fastq}
@@ -624,8 +593,6 @@ rule haplotypes_and_truth_heatmap:
     rules.haplotypes_and_truth.output.csv
   output:
     png="output/{dataset}/{qc}/{read_mapper}/{reference}/{haplotyper}/truth_and_haplotypes.png"
-  conda:
-    "envs/tidyverse.yml"
   script:
     "R/truth_heatmap.R"
     
@@ -646,8 +613,6 @@ rule regress_haplo_bam_to_variant_calls:
     "output/{dataset}/{reference}/sorted.bam.bai"
   output:
     "output/{dataset}/{reference}/variant_calls.csv"
-  conda:
-    "envs/regress-haplo.yml"
   script:
     "R/regress_haplo/bam_to_variant_calls.R"
    
@@ -657,8 +622,6 @@ rule regress_haplo_variant_calls_to_read_table:
     "output/{dataset}/{reference}/variant_calls.csv",
   output:
     "output/{dataset}/{reference}/read_table.csv"
-  conda:
-    "envs/regress-haplo.yml"
   script:
     "R/regress_haplo/variant_calls_to_read_table.R"
 
@@ -667,8 +630,6 @@ rule regress_haplo_read_table_to_loci:
     rules.regress_haplo_variant_calls_to_read_table.output[0]
   output:
     "output/{dataset}/{reference}/loci.csv"
-  conda:
-    "envs/regress-haplo.yml"
   script:
     "R/regress_haplo/read_table_to_loci.R"
 
@@ -677,8 +638,6 @@ rule regress_haplo_loci_to_haplotypes:
     rules.regress_haplo_read_table_to_loci.output[0]
   output:
     "output/{dataset}/{reference}/h.csv"
-  conda:
-    "envs/regress-haplo.yml"
   script:
     "R/regress_haplo/loci_to_haplotypes.R"
 
@@ -687,8 +646,6 @@ rule regress_haplo_haplotypes_to_parameters:
     rules.regress_haplo_loci_to_haplotypes.output[0]
   output:
     "output/{dataset}/{reference}/P.csv"
-  conda:
-    "envs/regress-haplo.yml"
   script:
     "R/regress_haplo/haplotypes_to_parameters.R"
 
@@ -697,8 +654,6 @@ rule regress_haplo_parameters_to_solutions:
     rules.regress_haplo_haplotypes_to_parameters.output[0]
   output:
     "output/{dataset}/{reference}/solutions.csv"
-  conda:
-    "envs/regress-haplo.yml"
   script:
     "R/regress_haplo/parameters_to_solutions.R"
 
@@ -707,8 +662,6 @@ rule regress_haplo_solutions_to_haplotypes:
     rules.regress_haplo_parameters_to_solutions.output[0]
   output:
     "output/{dataset}/{reference}/final_haplo.csv"
-  conda:
-    "envs/regress-haplo.yml"
   script:
     "R/regress_haplo/solutions_to_haplotypes.R"
 
@@ -718,8 +671,6 @@ rule regress_haplo_haplotypes_to_fasta:
     rules.regress_haplo_solutions_to_haplotypes.output[0]
   output:
     "output/{dataset}/{reference}/final_haplo.fasta"
-  conda:
-    "envs/regress-haplo.yml"
   script:
     "R/regress_haplo/haplotypes_to_fasta.R"
 
