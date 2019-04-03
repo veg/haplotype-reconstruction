@@ -107,10 +107,12 @@ rule amplicon_simulation:
     rules.extract_gene.output.fasta
   output:
     "output/lanl/{lanl_id}/{gene}/reads.fastq"
+  params:
+    out="output/lanl/{lanl_id}/{gene}/reads"
   shell:
     """
-      art_illumina -ss HS25 -i {input} -l 120 -s 50 -c 15000 -o {output}
-      mv {output}.fq {output}
+      art_illumina -ss HS25 -i {input} -l 120 -s 50 -c 15000 -o {params.out}
+      mv {params.out}.fq {output}
     """
 
 def amplicon_simulation_inputs(wildcards):
@@ -134,10 +136,12 @@ rule wgs_simulation:
     rules.extract_lanl_genome.output[0]
   output:
     "output/lanl/{lanl_id}/wgs.fastq"
+  params:
+    out="output/lanl/{lanl_id}/wgs"
   shell:
     """
-      art_illumina -ss HS25 -i {input} -l 120 -s 50 -c 150000 -o {output}
-      mv {output}.fq {output}
+      art_illumina -ss HS25 --samout -i {input} -l 120 -s 50 -c 150000 -o {params.out}
+      mv {params.out}.fq {output}
     """
 
 def wgs_simulation_inputs(wildcards):
@@ -151,8 +155,8 @@ rule simulate_wgs_dataset:
   input:
     wgs_simulation_inputs
   output:
-    fastq=temp("output/simulation_{simulated_dataset}/wgs.fastq"),
-    fasta="output/simulation_{simulated_dataset}/truth.fasta"
+    fastq=temp("output/wgs-simulation_{simulated_dataset}/wgs.fastq"),
+    fasta="output/wgs-simulation_{simulated_dataset}/truth.fasta"
   run:
     simulate_wgs_dataset(wildcards.simulated_dataset, output.fastq, output.fasta)
 
@@ -202,6 +206,11 @@ def situate_input(wildcards):
   is_evolution_dataset = dataset[:7] == 'ERS6610'
   if is_evolution_dataset:
     return "input/evolution/%s.fastq" % dataset
+  is_amplicon_dataset = 'amplicon' in dataset
+  if is_amplicon_dataset:
+    gene_info, dataset_name = dataset.split('-')
+    gene = gene_info.split('_')[1]
+    return "output/%s/%s/reads.fastq" % (dataset_name, gene)
   is_simulated_dataset = 'simulation' in dataset
   if is_simulated_dataset:
     return "output/%s/wgs.fastq" % dataset
@@ -292,9 +301,7 @@ rule situate_references:
   output:
     "output/references/{reference}.fasta"
   shell:
-    """
-      cp {input} {output}
-    """
+    "cp {input} {output}"
 
 rule bwa_map_reads:
   input:
