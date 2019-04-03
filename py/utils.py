@@ -1,3 +1,5 @@
+import numpy as np
+import pandas as pd
 from Bio import SeqIO
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
@@ -86,4 +88,49 @@ seq_err (assumed sequencing error rate(%%)) : 0.1
 MEC improvement threshold : 0.0395 """ % (reference_filename, sam_filename) )
   with open(output, 'w') as config_file:
     config_file.write(config_string)
+
+
+def parse_abayesqr_output(input_text, output_fasta):
+    with open(input_text) as input_file:
+        lines = input_file.readlines()
+    records = []
+    for i, line in enumerate(lines):
+        if i % 2 == 0:
+            freq = float(line.split()[-1])
+            number = int(i/2)+1
+            header = 'haplotype-%d_freq-%f' % (number, freq)
+        if i % 2 == 1:
+            seq = Seq(line.strip())
+            record = SeqRecord(seq, id=header, description='')
+            records.append(record)
+    SeqIO.write(records, output_fasta, 'fasta')
+
+
+def pairwise_distance_csv(fasta_filename, csv_filename):
+    records = list(SeqIO.parse(fasta_filename, 'fasta'))
+    np_seqs = np.array(
+        [list(str(record.seq)) for record in records],
+        dtype='<U1'
+    )
+    first_records = []
+    second_records = []
+    distances = []
+    for i in range(len(records)):
+        for j in range(len(records)):
+            first_records.append(records[i].id)
+            second_records.append(records[j].id)
+            distance = (np_seqs[i, :] != np_seqs[j, :]).sum()
+            distances.append(distance)
+    pd.DataFrame({
+        'first_record': first_records,
+        'second_record': second_records,
+        'distance': distances,
+    }).to_csv(csv_filename)
+
+
+def add_subtype_information(input_csv, output_csv):
+    df = pd.read_csv(input_csv)
+    df['Subtype1'] = df['ID1'].apply(lambda row: row.split('.')[0])
+    df['Subtype2'] = df['ID2'].apply(lambda row: row.split('.')[0])
+    df.to_csv(output_csv, index=False)
 

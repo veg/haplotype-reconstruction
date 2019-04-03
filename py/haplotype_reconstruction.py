@@ -76,7 +76,7 @@ def embed_and_reduce_dimensions(arguments):
     return df
 
 
-def embed_and_reduce_all_dimensions(records, overlap_fraction=.5, ncpu=20):
+def embed_and_reduce_all_dimensions(records, overlap_fraction=.3, ncpu=20):
     index, numeric_fasta = create_numeric_fasta(records)
     info_json = {
         'local_starts': [],
@@ -289,20 +289,4 @@ def evaluate(input_haplotypes, input_truth, output_json):
     }
     with open(output_json, 'w') as json_file:
         json.dump(output, json_file, indent=2)
-
-
-def parse_abayesqr_output(input_text, output_fasta):
-    with open(input_text) as input_file:
-        lines = input_file.readlines()
-    records = []
-    for i, line in enumerate(lines):
-        if i % 2 == 0:
-            freq = float(line.split()[-1])
-            number = int(i/2)+1
-            header = 'haplotype-%d_freq-%f' % (number, freq)
-        if i % 2 == 1:
-            seq = Seq(line.strip())
-            record = SeqRecord(seq, id=header, description='')
-            records.append(record)
-    SeqIO.write(records, output_fasta, 'fasta')
 

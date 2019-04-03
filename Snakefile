@@ -11,20 +11,56 @@ from py import obtain_consensus_io
 from py import superreads_to_haplotypes_io
 from py import evaluate
 from py import parse_abayesqr_output
+from py import pairwise_distance_csv
+from py import add_subtype_information
 
 
 with open('simulations.json') as simulation_file:
   SIMULATION_INFORMATION = json.load(simulation_file)
+with open('compartmentalization.json') as simulation_file:
+  COMPARTMENT_INFORMATION = json.load(simulation_file)
 ACCESSION_NUMBERS = ['ERS6610%d' % i for i in range(87, 94)]
 SIMULATED_DATASETS = ['simulation_' + dataset for dataset in SIMULATION_INFORMATION.keys()]
 RECONSTRUCTION_DATASETS = [
   "93US141_100k_14-159320-1GN-0_S16_L001_R1_001",
   "PP1L_S45_L001_R1_001",
-  "sergei1"
+  "sergei1",
+  "FiveVirusMixIllumina_1"
 ]
 ALL_DATASETS = ACCESSION_NUMBERS + SIMULATED_DATASETS + RECONSTRUCTION_DATASETS
-REFERENCES = ["env_C2V5", "gag_p24", "pr", "rt"]
+ALL_REFERENCES = ["env", "rev", "vif", "pol", "prrt", "rt", "pr", "gag", "int", "tat"] # + ["nef", "vpr"] 
+REFERENCE_SUBSET = ["env", "pol", "gag"]
 HYPHY_PATH = "/Users/stephenshank/Software/lib/hyphy"
+HAPLOTYPERS = ["abayesqr", "savage", "regress_haplo", "quasirecomb"]
+
+rule dynamics_and_evolution:
+  input:
+    expand(
+      "output/{dataset}/qfilt/bealign/{reference}/{haplotyper}/haplotypes.fasta",
+      dataset=ALL_DATASETS,
+      reference=["env", "gag", "pol"],
+      haplotyper=HAPLOTYPERS
+    ),
+    expand(
+      "output/{dataset}/fastp/bowtie2/{reference}/{haplotyper}/haplotypes.fasta",
+      dataset=ALL_DATASETS,
+      reference=["env", "gag", "pol"],
+      haplotyper=HAPLOTYPERS
+    ),
+    expand(
+      "output/{dataset}/reads_fastqc.html",
+      dataset=ALL_DATASETS
+    ),
+    expand(
+      "output/{dataset}/qfilt/bealign/{reference}/qualimapReport.html",
+      dataset=ALL_DATASETS,
+      reference=["env", "gag", "pol"]
+    ),
+    expand(
+      "output/{dataset}/fastp/bowtie2/{reference}/qualimapReport.html",
+      dataset=ALL_DATASETS,
+      reference=["env", "gag", "pol"]
+    )
 
 ##################
 # RECONSTRUCTION #
@@ -58,8 +94,8 @@ rule align_simulated:
     reference=rules.extract_gene.input.reference,
     target=rules.extract_gene.output.fasta
   output:
-    unaligned="output/{simulated_dataset}/{gene}/unaligned.fasta",
-    aligned="output/{simulated_dataset}/{gene}/aligned.fasta"
+    unaligned="output/amplicon/{simulated_dataset}/{gene}/unaligned.fasta",
+    aligned="output/amplicon/{simulated_dataset}/{gene}/aligned.fasta"
   shell:
     """
       cat {input.target} {input.reference} > {output.unaligned}
@@ -71,10 +107,12 @@ rule amplicon_simulation:
     rules.extract_gene.output.fasta
   output:
     "output/lanl/{lanl_id}/{gene}/reads.fastq"
+  params:
+    out="output/lanl/{lanl_id}/{gene}/reads"
   shell:
     """
-      art_illumina -ss HS25 -i {input} -l 120 -s 50 -c 15000 -o {output}
-      mv {output}.fq {output}
+      art_illumina -ss HS25 -i {input} -l 120 -s 50 -c 15000 -o {params.out}
+      mv {params.out}.fq {output}
     """
 
 def amplicon_simulation_inputs(wildcards):
@@ -98,10 +136,12 @@ rule wgs_simulation:
     rules.extract_lanl_genome.output[0]
   output:
     "output/lanl/{lanl_id}/wgs.fastq"
+  params:
+    out="output/lanl/{lanl_id}/wgs"
   shell:
     """
-      art_illumina -ss HS25 -i {input} -l 120 -s 50 -c 150000 -o {output}
-      mv {output}.fq {output}
+      art_illumina -ss HS25 --samout -i {input} -l 120 -s 50 -c 150000 -o {params.out}
+      mv {params.out}.fq {output}
     """
 
 def wgs_simulation_inputs(wildcards):
@@ -115,10 +155,49 @@ rule simulate_wgs_dataset:
   input:
     wgs_simulation_inputs
   output:
-    fastq="output/simulation_{simulated_dataset}/wgs.fastq",
-    fasta="output/simulation_{simulated_dataset}/truth.fasta"
+    fastq=temp("output/wgs-simulation_{simulated_dataset}/wgs.fastq"),
+    fasta="output/wgs-simulation_{simulated_dataset}/truth.fasta"
   run:
     simulate_wgs_dataset(wildcards.simulated_dataset, output.fastq, output.fasta)
+
+rule all_lanl_genes:
+  input:
+    lanl="input/LANL-HIV.fasta",
+    reference="input/references/{reference}.fasta"
+  output:
+    sam="output/lanl/{reference}.sam",
+    fasta="output/lanl/{reference}.fasta",
+    csv=temp("output/lanl/{reference}-no_subtypes.csv")
+  shell:
+    """
+      bealign -r {input.reference} {input.lanl} {output.sam}
+      bam2msa {output.sam} {output.fasta}
+      tn93 -t 1 -o {output.csv} {output.fasta}
+    """
+
+rule distances_for_simulating:
+  input:
+    rules.all_lanl_genes.output.csv
+  output:
+    "output/lanl/{reference}.csv"
+  run:
+    add_subtype_information(input[0], output[0])
+
+rule genome_distances:
+  input:
+    "input/LANL-HIV-aligned.fasta"
+  output:
+    temp("output/lanl/distances-no_subtypes.csv")
+  shell:
+    "tn93 -t 1 -o {output} {input}"
+
+rule genome_distances_with_subtypes:
+  input:
+    rules.genome_distances.output[0]
+  output:
+    "output/lanl/distances.csv"
+  run:
+    add_subtype_information(input[0], output[0])
 
 # Situating other data
 
@@ -127,12 +206,17 @@ def situate_input(wildcards):
   is_evolution_dataset = dataset[:7] == 'ERS6610'
   if is_evolution_dataset:
     return "input/evolution/%s.fastq" % dataset
+  is_amplicon_dataset = 'amplicon' in dataset
+  if is_amplicon_dataset:
+    gene_info, dataset_name = dataset.split('-')
+    gene = gene_info.split('_')[1]
+    return "output/%s/%s/reads.fastq" % (dataset_name, gene)
   is_simulated_dataset = 'simulation' in dataset
   if is_simulated_dataset:
     return "output/%s/wgs.fastq" % dataset
   return "input/reconstruction/%s.fastq" % dataset
 
-rule situate_intrahost_data:
+rule situate_data:
   input:
     situate_input
   output:
@@ -144,36 +228,56 @@ rule situate_intrahost_data:
 
 rule qfilt:
   input:
-    rules.situate_intrahost_data.output[0]
+    rules.situate_data.output[0]
   output:
     fasta="output/{dataset}/qfilt/qc.fasta",
     json="output/{dataset}/qfilt/qc.json",
+    html="output/{dataset}/reads_fastqc.html"
+  params:
+    dir="output/{dataset}"
   shell:
-    "qfilt -Q {input} -q 15 -l 50 -P - -R 8 -j >> {output.fasta} 2>> {output.json}"
+    """
+      qfilt -Q {input} -q 15 -l 50 -j >> {output.fasta} 2>> {output.json}
+      fastqc {input} -o {params.dir}
+    """
+
+def fasta_454(wildcards):
+  if wildcards.dataset == 'example_454':
+    return "input/reconstruction/3.GAC.454Reads.fna"
+  head = "input/compartmentalization/"
+  tail = "/".join(wildcards.dataset.split('-'))
+  return head + tail + "/reads.fasta"
+
+def qual_454(wildcards):
+  if wildcards.dataset == 'example_454':
+    return "input/reconstruction/3.GAC.454Reads.qual"
+  head = "input/compartmentalization/"
+  tail = "/".join(wildcards.dataset.split('-'))
+  return head + tail + "/scores.qual"
 
 rule qfilt_454:
   input:
-    fasta="input/reconstruction/3.GAC.454Reads.fna",
-    qual="input/reconstruction/3.GAC.454Reads.qual"
+    fasta=fasta_454,
+    qual=qual_454
   output:
-    fasta="output/454/qfilt/qc.fasta",
-    json="output/454/qfilt/qc.json"
+    fasta="output/{dataset}/qfilt/qc.fasta",
+    json="output/{dataset}/qfilt/qc.json"
   shell:
-    "qfilt -F {input.fasta} {input.qual} -q 15 -l 50 -P - -R 8 -j >> {output.fasta} 2>> {output.json}"
+    "qfilt -F {input.fasta} {input.qual} -q 20 -l 50 -j >> {output.fasta} 2>> {output.json}"
 
 rule fastp:
   input:
-    rules.situate_intrahost_data.output[0]
+    rules.situate_data.output[0]
   output:
     fastq="output/{dataset}/fastp/qc.fastq",
     json="output/{dataset}/fastp/qc.json",
     html="output/{dataset}/fastp/qc.html"
   shell:
-    "fastp -A -q 8 -i {input} -o {output.fastq} -j {output.json} -h {output.html}"
+    "fastp -A -q 15 -i {input} -o {output.fastq} -j {output.json} -h {output.html}"
 
 rule trimmomatic:
   input:
-    rules.situate_intrahost_data.output[0]
+    rules.situate_data.output[0]
   output:
     "output/{dataset}/trimmomatic/qc.fastq"
   shell:
@@ -191,16 +295,13 @@ rule bealign:
   shell:
     "bealign -r {input.reference} -e 0.5 -m HIV_BETWEEN_F -D {output.discards} -R {input.qc} {output.bam}"
 
-rule bwa_reference_index:
+rule situate_references:
   input:
     "input/references/{reference}.fasta"
   output:
     "output/references/{reference}.fasta"
   shell:
-    """
-      cp {input} {output}
-      bwa index {output}
-    """
+    "cp {input} {output}"
 
 rule bwa_map_reads:
   input:
@@ -209,7 +310,26 @@ rule bwa_map_reads:
   output:
     "output/{dataset}/{qc}/bwa/{reference}/mapped.bam"
   shell:
-    "bwa mem {input.reference} {input.fastq} > {output}"
+    """
+      bwa index {input.reference}
+      bwa mem {input.reference} {input.fastq} > {output}
+    """
+
+rule bowtie2:
+  input:
+    fastq="output/{dataset}/{qc}/qc.fastq",
+    reference="output/references/{reference}.fasta"
+  output:
+    sam="output/{dataset}/{qc}/bowtie2/{reference}/mapped.sam",
+    bam="output/{dataset}/{qc}/bowtie2/{reference}/mapped.bam"
+  params:
+    lambda wildcards: "output/references/%s" % wildcards.reference
+  shell:
+    """
+      bowtie2-build {input.reference} {params}
+      bowtie2 -x {params} -U {input.fastq} -S {output.sam}
+      samtools view -Sb {output.sam} > {output.bam}
+    """
 
 rule sort_and_index:
   input:
@@ -227,12 +347,30 @@ rule sort_and_index:
       samtools index {output.bam}
     """
 
+rule qualimap:
+  input:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.bam"
+  output:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/qualimapReport.html"
+  params:
+    dir="output/{dataset}/{qc}/{read_mapper}/{reference}"
+  shell:
+    "qualimap bamqc -bam {input} -outdir {params.dir}"
+
 rule all_acme_bams:
   input:
     expand(
       "output/{dataset}/qfilt/bealign/{reference}/sorted.bam",
       dataset=ALL_DATASETS,
-      reference=REFERENCES
+      reference=ALL_REFERENCES
+    )
+
+rule all_bowtie_bams:
+  input:
+    expand(
+      "output/{dataset}/fastp/bowtie2/{reference}/sorted.bam",
+      dataset=ALL_DATASETS,
+      reference=ALL_REFERENCES
     )
 
 # Haplotype reconstruction (full pipelines)
@@ -242,16 +380,24 @@ rule regress_haplo_full:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.bam",
     "output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.bam.bai",
   output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/final_haplo.fasta"
+    temp("output/{dataset}/{qc}/{read_mapper}/{reference}/regress_haplo/final_haplo.fasta")
   script:
     "R/regress_haplo/full_pipeline.R"
+
+rule regress_haplo_rightname:
+  input:
+    rules.regress_haplo_full.output[0]
+  output:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/regress_haplo/haplotypes.fasta"
+  shell:
+    "mv {input} {output}"
 
 rule all_acme_regress_haplo:
   input:
     expand(
       "output/{dataset}/qfilt/bealign/{reference}/final_haplo.fasta",
       dataset=ALL_DATASETS,
-      reference=REFERENCES
+      reference=ALL_REFERENCES
     )
 
 rule haploclique:
@@ -272,17 +418,47 @@ rule quasirecomb:
   input:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.bam"
   output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/quasirecomb/output.fasta"
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/quasirecomb/haplotypes.fasta"
   params:
-    basedir="output/{dataset}/{qc}/{read_mapper}/{reference}/quasirecomb/"
+    basedir="output/{dataset}/{qc}/{read_mapper}/{reference}/quasirecomb"
   shell:
     """
-      java -jar ~/QuasiRecomb.jar -i {input}
-      mv support/* {params.basedir}
-      rmdir support
-      mv piDist.txt {params.basedir}
-      mv quasispecies.fasta {params.basedir}/output.fasta
+      java -jar ~/QuasiRecomb.jar -conservative -o {params.basedir} -i {input}
+      mv {params.basedir}/quasispecies.fasta {params.basedir}/haplotypes.fasta
     """
+
+rule all_quasirecomb:
+  input:
+    expand(
+      "output/{dataset}/fastp/bowtie2/{reference}/quasirecomb/haplotypes.fasta",
+      dataset=ALL_DATASETS,
+      reference=REFERENCE_SUBSET
+    )
+
+rule savage:
+  input:
+    bam="output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.bam",
+    reference="input/references/{reference}.fasta"
+  output:
+    fastq="output/{dataset}/{qc}/{read_mapper}/{reference}/savage/reads.fastq",
+    fasta="output/{dataset}/{qc}/{read_mapper}/{reference}/savage/haplotypes.fasta"
+  params:
+    outdir="output/{dataset}/{qc}/{read_mapper}/{reference}/savage",
+    intermediate="output/{dataset}/{qc}/{read_mapper}/{reference}/savage/contigs_stage_c.fasta"
+  shell:
+    """
+      bamToFastq -i {input.bam} -fq {output.fastq}
+      savage -s {output.fastq} --ref `pwd`/{input.reference} --split 3 --num_threads 12 --outdir {params.outdir}
+      mv {params.intermediate} {output.fasta}
+    """
+
+rule all_savage:
+  input:
+    expand(
+      "output/{dataset}/qfilt/bealign/{reference}/savage/haplotypes.fasta",
+      dataset=ALL_DATASETS,
+      reference=ALL_REFERENCES
+    )
 
 rule abayesqr:
   input:
@@ -302,20 +478,46 @@ rule abayesqr:
     shell("mv test_ViralSeq.txt {output.viralseq}")
     parse_abayesqr_output(output.viralseq, output.fasta)
 
-# ACME haplotype reconstruction
+rule all_abayesqr:
+  input:
+    expand(
+      "output/{dataset}/qfilt/bealign/{reference}/abayesqr/haplotypes.fasta",
+      dataset=ALL_DATASETS,
+      reference=ALL_REFERENCES
+    )
+
+rule abayesqr_intrahost:
+  input:
+    expand(
+      "output/{dataset}/qfilt/bealign/{reference}/abayesqr/haplotypes.fasta",
+      dataset=ACCESSION_NUMBERS,
+      reference=REFERENCE_SUBSET
+    )
+
+# VEG haplotype reconstruction
 
 rule mmvc:
   input:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.fasta"
   output:
-    json="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/mmvc.json",
-    fasta="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/mmvc.fasta"
+    json="output/{dataset}/{qc}/{read_mapper}/{reference}/mmvc.json",
+    fasta="output/{dataset}/{qc}/{read_mapper}/{reference}/mmvc.fasta"
   shell:
     "mmvc -j {output.json} -f {output.fasta} {input}"
 
+rule readreduce:
+  input:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/mmvc.fasta"
+  output:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/haplosuperreads.fasta"
+  shell:
+    "readreduce -a resolve -l 30 -s 16 -o {output} {input}"
+
+# ACME haplotype reconstruction
+
 rule embed_and_reduce_dimensions:
   input:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/mmvc.fasta"
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/mmvc.fasta"
   output:
     csv="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/dr.csv",
     json="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/dr.json"
@@ -364,14 +566,6 @@ rule superreads_and_truth:
       mafft {output.unaligned} > {output.aligned}
     """
 
-rule readreduce:
-  input:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/mmvc.fasta"
-  output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/haplosuperreads.fasta"
-  shell:
-    "readreduce -a resolve -l 30 -s 16 -o {output} {input}"
-
 rule superreads_to_haplotypes:
   input:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/superreads.fasta"
@@ -390,14 +584,25 @@ rule acme_haplotype_dag:
 
 rule haplotypes_and_truth:
   input:
-    haplotypes="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/haplotypes.fasta",
+    haplotypes="output/{dataset}/{qc}/{read_mapper}/{reference}/{haplotyper}/haplotypes.fasta",
     truth="output/{dataset}/{reference}/truth.fasta"
   output:
-    fasta="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/truth_and_haplotypes.fasta",
-    json="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/truth_and_haplotypes.json"
+    unaligned="output/{dataset}/{qc}/{read_mapper}/{reference}/{haplotyper}/truth_and_haplotypes_unaligned.fasta",
+    aligned="output/{dataset}/{qc}/{read_mapper}/{reference}/{haplotyper}/truth_and_haplotypes.fasta",
+    csv="output/{dataset}/{qc}/{read_mapper}/{reference}/{haplotyper}/truth_and_haplotypes.csv"
   run:
-    shell("cat {input.truth} {input.haplotypes} > {output.fasta}")
-    evaluate(input.haplotypes, input.truth, output.json)
+    shell("cat {input.haplotypes} {input.truth} > {output.unaligned}")
+    shell("mafft {output.unaligned} > {output.aligned}")
+    pairwise_distance_csv(output.aligned, output.csv)
+
+rule haplotypes_and_truth_heatmap:
+  input:
+    rules.haplotypes_and_truth.output.csv
+  output:
+    png="output/{dataset}/{qc}/{read_mapper}/{reference}/{haplotyper}/truth_and_haplotypes.png"
+  script:
+    "R/truth_heatmap.R"
+    
 
 rule dashboard:
   output:
@@ -483,11 +688,14 @@ rule regress_haplo_haplotypes_to_fasta:
 
 rule concatenate:
   input:
-    expand("output/{dataset}/{{qc}}/{{read_mapper}}/{{reference}}/{{haplotyper}}/haplotypes.fasta", dataset=ACCESSION_NUMBERS)
+    expand("output/{dataset}/qfilt/bealign/{{reference}}/{{haplotyper}}/haplotypes.fasta", dataset=ACCESSION_NUMBERS)
   output:
-    "output/evolution/qc-{qc}_rm-{read_mapper}_ht-{haplotyper}/{reference}_unaligned.fasta"
+    "output/evolution/{qc}/{read_mapper}/{reference}/{haplotyper}/unaligned.fasta"
   params:
-    lambda wildcards: ' '.join(["output/%s/%s/haplotypes/final_haplo.fasta" % (accession, wildcards.reference) for accession in ACCESSION_NUMBERS])
+    lambda wildcards: ' '.join([
+      "output/%s/qfilt/bealign/%s/%s/haplotypes.fasta" % 
+      (accession, wildcards.reference, wildcards.haplotyper) for accession in ACCESSION_NUMBERS
+    ])
   shell:
     "cat {params} > {output}"
 
@@ -495,9 +703,17 @@ rule alignment:
   input:
     rules.concatenate.output[0]
   output:
-    "output/{reference}/aligned.fasta"
+    "output/evolution/{qc}/{read_mapper}/{reference}/{haplotyper}/aligned.fasta"
   shell:
     "mafft {input} > {output}"
+
+rule tree:
+  input:
+    rules.alignment.output[0]
+  output:
+    "output/evolution/{qc}/{read_mapper}/{reference}/{haplotyper}/tree.new"
+  shell:
+    "FastTree -nt {input} > {output}"
 
 #rule recombination_screening:
 #  input:
