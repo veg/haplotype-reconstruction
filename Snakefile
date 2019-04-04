@@ -4,12 +4,14 @@ import json
 from py import extract_lanl_genome
 from py import simulate_amplicon_dataset 
 from py import simulate_wgs_dataset 
-from py import write_abayesqr_config
+
 from py import embed_and_reduce_all_dimensions_io
 from py import cluster_blocks_io
 from py import obtain_consensus_io
 from py import superreads_to_haplotypes_io
+
 from py import evaluate
+from py import write_abayesqr_config
 from py import parse_abayesqr_output
 from py import pairwise_distance_csv
 from py import add_subtype_information
@@ -111,7 +113,7 @@ rule amplicon_simulation:
     out="output/lanl/{lanl_id}/{gene}/reads"
   shell:
     """
-      art_illumina -ss HS25 -i {input} -l 120 -s 50 -c 15000 -o {params.out}
+      art_illumina -rs 1 -ss HS25 -i {input} -l 120 -s 50 -c 15000 -o {params.out}
       mv {params.out}.fq {output}
     """
 
@@ -126,8 +128,8 @@ rule simulate_amplicon_dataset:
   input:
     amplicon_simulation_inputs
   output:
-    fastq="output/simulation_{simulated_dataset}/{gene}/reads.fastq",
-    fasta="output/simulation_{simulated_dataset}/{gene}/truth.fasta"
+    fastq=temp("output/amplicon_{gene}-simulation_{simulated_dataset}/amplicon.fastq"),
+    fasta="output/amplicon_{gene}-simulation_{simulated_dataset}/truth.fasta"
   run:
     simulate_amplicon_dataset(wildcards.simulated_dataset, wildcards.gene, output.fastq, output.fasta)
 
@@ -140,7 +142,7 @@ rule wgs_simulation:
     out="output/lanl/{lanl_id}/wgs"
   shell:
     """
-      art_illumina -ss HS25 --samout -i {input} -l 120 -s 50 -c 150000 -o {params.out}
+      art_illumina -rs 1 -ss HS25 --samout -i {input} -l 120 -s 50 -c 150000 -o {params.out}
       mv {params.out}.fq {output}
     """
 
@@ -204,14 +206,13 @@ rule genome_distances_with_subtypes:
 def situate_input(wildcards):
   dataset = wildcards.dataset
   is_evolution_dataset = dataset[:7] == 'ERS6610'
+  is_amplicon_dataset = 'amplicon' in dataset
+  is_simulated_dataset = 'simulation' in dataset
+
   if is_evolution_dataset:
     return "input/evolution/%s.fastq" % dataset
-  is_amplicon_dataset = 'amplicon' in dataset
   if is_amplicon_dataset:
-    gene_info, dataset_name = dataset.split('-')
-    gene = gene_info.split('_')[1]
-    return "output/%s/%s/reads.fastq" % (dataset_name, gene)
-  is_simulated_dataset = 'simulation' in dataset
+    return "output/%s/amplicon.fastq" % dataset
   if is_simulated_dataset:
     return "output/%s/wgs.fastq" % dataset
   return "input/reconstruction/%s.fastq" % dataset
@@ -515,64 +516,16 @@ rule readreduce:
 
 # ACME haplotype reconstruction
 
-rule embed_and_reduce_dimensions:
-  input:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/mmvc.fasta"
-  output:
-    csv="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/dr.csv",
-    json="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/dr.json"
-  run:
-    embed_and_reduce_all_dimensions_io(input[0], output.csv, output.json)
+#rule error_correction:
+#  input:
+#    "output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.bam"
+#  output:
+#    bam="output/{dataset}/{qc}/{read_mapper}/{reference}/error_corrected.bam",
+#    csv="output/{dataset}/{qc}/{read_mapper}/{reference}/error_corrected.csv"
+#  run:
+#    error_correction_io(input[0], output.bam, output.csv)
 
-rule cluster_blocks:
-  input:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/dr.csv"
-  output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/clustered.csv"
-  run:
-    cluster_blocks_io(input[0], output[0])
-
-rule cluster_blocks_image:
-  input:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/clustered.csv",
-    "output/{dataset}/{reference}/truth.fasta"
-  output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/clustered_truth.png",
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/clustered_inferred.png",
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/counts.png"
-  script:
-    "R/cluster_plot.R"
-
-rule obtain_superreads:
-  input:
-    csv=rules.cluster_blocks.output[0],
-    fasta=rules.sort_and_index.output.fasta,
-    json=rules.embed_and_reduce_dimensions.output.json
-  output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/superreads.fasta",
-  run:
-    obtain_consensus_io(input.csv, input.fasta, input.json, output[0])
-
-rule superreads_and_truth:
-  input:
-    superreads="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/superreads.fasta",
-    truth="output/{dataset}/{reference}/truth.fasta"
-  output:
-    unaligned="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/truth_and_superreads_unaligned.fasta",
-    aligned="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/truth_and_superreads.fasta"
-  shell:
-    """
-      cat {input.truth} {input.superreads} > {output.unaligned}
-      mafft {output.unaligned} > {output.aligned}
-    """
-
-rule superreads_to_haplotypes:
-  input:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/superreads.fasta"
-  output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/haplotypes.fasta"
-  run:
-    superreads_to_haplotypes_io(input[0], output[0])
+# Results
 
 rule acme_haplotype_dag:
   output:
@@ -602,7 +555,6 @@ rule haplotypes_and_truth_heatmap:
     png="output/{dataset}/{qc}/{read_mapper}/{reference}/{haplotyper}/truth_and_haplotypes.png"
   script:
     "R/truth_heatmap.R"
-    
 
 rule dashboard:
   output:
