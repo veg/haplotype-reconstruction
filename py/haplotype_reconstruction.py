@@ -2,8 +2,10 @@ import json
 from multiprocessing import Pool
 from collections import OrderedDict
 from collections import Counter
+from math import ceil
 
 import numpy as np
+import pysam
 import pandas as pd
 from Bio import SeqIO
 from Bio.Seq import Seq
