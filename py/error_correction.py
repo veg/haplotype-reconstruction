@@ -18,10 +18,10 @@ class ErrorCorrection:
         self.reference_length = pysam_alignment.header['SQ'][0]['LN']
         self.number_of_windows = floor(self.reference_length/stride)
         self.reads_in_window = [[] for _ in range(self.number_of_windows)]
-        window_boundaries = np.arange(stride, self.reference_length, stride)
+        window_boundaries = np.arange(0, self.reference_length, stride)
         window_boundaries[-1] = self.reference_length
-        self.left_boundaries = window_boundaries - slack
-        self.right_boundaries = window_boundaries + slack
+        self.left_boundaries = window_boundaries[:-1] + slack
+        self.right_boundaries = window_boundaries[1:] - slack
 
     def get_window_range(self, read):
         left_index = np.searchsorted(
@@ -31,12 +31,12 @@ class ErrorCorrection:
         right_index = np.searchsorted(
             self.right_boundaries,
             read.reference_end
-        )
+        ) - 1
         return left_index, right_index
 
     def assign_read_to_windows(self, read, read_index):
         left_window_index, right_window_index = self.get_window_range(read)
-        for window_index in range(left_window_index, right_window_index+1):
+        for window_index in range(left_window_index, right_window_index + 1):
             self.reads_in_window[window_index].append(read_index)
 
     def assign_all_reads(self):
