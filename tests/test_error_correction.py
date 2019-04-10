@@ -4,6 +4,7 @@ import os
 import pysam
 
 from py import ErrorCorrection
+from py import cluster_and_correct
 
 
 class MockPysamAlignedSegment:
@@ -98,7 +99,18 @@ class TestRealErrorCorrection(unittest.TestCase):
             self.alignment, number_of_reads,
             number_of_processes=10
         )
-    def test_full_pipeline(self):
+
+    def test_cluster_and_correct(self):
         self.error_correction.assign_all_reads()
-        self.error_correction.get_corrections()
+        packed_arguments = (
+            self.alignment,
+            self.error_correction.reads_in_window[0],
+            (0, 50),
+            0
+        )
+        corrections_df = cluster_and_correct(packed_arguments)
+        self.assertTrue(len(corrections_df) > 0)
+
+    def test_full_pipeline(self):
+        self.error_correction.perform_error_correction()
 

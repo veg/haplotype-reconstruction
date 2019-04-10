@@ -5,10 +5,7 @@ from py import extract_lanl_genome
 from py import simulate_amplicon_dataset 
 from py import simulate_wgs_dataset 
 
-from py import embed_and_reduce_all_dimensions_io
-from py import cluster_blocks_io
-from py import obtain_consensus_io
-from py import superreads_to_haplotypes_io
+from py import error_correction_io
 
 from py import evaluate
 from py import write_abayesqr_config
@@ -516,14 +513,14 @@ rule readreduce:
 
 # ACME haplotype reconstruction
 
-#rule error_correction:
-#  input:
-#    "output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.bam"
-#  output:
-#    bam="output/{dataset}/{qc}/{read_mapper}/{reference}/error_corrected.bam",
-#    csv="output/{dataset}/{qc}/{read_mapper}/{reference}/error_corrected.csv"
-#  run:
-#    error_correction_io(input[0], output.bam, output.csv)
+rule error_correction:
+  input:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.bam"
+  output:
+    bam="output/{dataset}/{qc}/{read_mapper}/{reference}/error_corrected.bam",
+    csv="output/{dataset}/{qc}/{read_mapper}/{reference}/corrections.csv"
+  run:
+    error_correction_io(input[0], output.bam, output.csv)
 
 # Results
 
