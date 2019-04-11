@@ -6,7 +6,7 @@ import pandas as pd
 from sklearn.manifold import TSNE
 from sklearn.neighbors import KDTree
 
-from .numeric_sequence import NumericSequence
+from .sam_fasta_converter import SAMFASTAConverter
 
 
 def cluster_and_correct(packed_arguments):
@@ -15,7 +15,7 @@ def cluster_and_correct(packed_arguments):
     pysam_alignment, read_indices_from_window, boundaries, index = packed_arguments
     read_indices_from_window = np.array(read_indices_from_window, dtype=np.int)
     left_boundary, right_boundary = boundaries
-    numeric_sequence = NumericSequence()
+    numeric_sequence = SAMFASTAConverter()
     nrows = len(read_indices_from_window)
     ncols = 5*(right_boundary - left_boundary)
     embedding = np.zeros((nrows, ncols))
