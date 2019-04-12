@@ -34,17 +34,20 @@ class AlignedSegment:
         return self.query_alignment_sequence[self.position_in_query]
 
     def advance(self):
-        current_action, current_stride = self.current_cigar_tuple
-        self.position_in_current_cigar_tuple += 1
+        if not self.exited:
+            current_action, current_stride = self.current_cigar_tuple
+            self.position_in_current_cigar_tuple += 1
 
-        if self.position_in_current_cigar_tuple == current_stride:
-            self.current_cigar_tuple_index += 1
-            self.position_in_current_cigar_tuple = 0
+            if self.position_in_current_cigar_tuple == current_stride:
+                self.current_cigar_tuple_index += 1
+                self.position_in_current_cigar_tuple = 0
+                if self.current_cigar_tuple_index == len(self.cigartuples):
+                    self.exited = True
 
-        if current_action == 0 or current_action == 1:
-            self.position_in_query += 1
-        if current_action == 0 or current_action == 2:
-            self.position_in_reference += 1
+            if current_action == 0 or current_action == 1:
+                self.position_in_query += 1
+            if current_action == 0 or current_action == 2:
+                self.position_in_reference += 1
 
     def initiate_left_extended_segment(self, window_start):
         while self.position_in_reference < window_start:
@@ -66,6 +69,8 @@ class AlignedSegment:
             self.initiate_right_extended_segment()
 
     def handle_deletion_and_match(self, current_position_in_reference):
+        if self.exited:
+            return '-'
         if self.position_in_reference == current_position_in_reference:
             self.entered = True
         
@@ -77,16 +82,15 @@ class AlignedSegment:
                 character = '-'
             self.advance()
             return character
-        if self.exited:
-            return '-'
         if not self.entered:
             return '-'
 
     def handle_insertion(self):
-        character = self.query_alignment_sequence[self.position_in_query]
-        self.advance()
-        return character
-
+        if not self.exited:
+            character = self.query_alignment_sequence[self.position_in_query]
+            self.advance()
+            return character
+        return '-'
 
 
 class SAMFASTAConverter:
@@ -170,16 +174,21 @@ class SAMFASTAConverter:
     def handle_insertions(self):
         insertions = []
         for i, segment in enumerate(self.aligned_segments):
+            if segment.exited:
+                continue
             action = segment.current_cigar_tuple[0]
             if action == 1:
                 insertions.append(i)
         if len(insertions) > 0:
             for i, segment in enumerate(self.aligned_segments):
-                action = segment.current_cigar_tuple[0]
-                if action == 1:
-                    character = segment.handle_insertion()
-                else:
+                if segment.exited:
                     character = '-'
+                else:
+                    action = segment.current_cigar_tuple[0]
+                    if action == 1:
+                        character = segment.handle_insertion()
+                    else:
+                        character = '-'
                 self.fasta[i, self.position_in_fasta] = character
             self.position_in_fasta += 1
             return True

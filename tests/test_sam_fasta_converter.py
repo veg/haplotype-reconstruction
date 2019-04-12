@@ -98,13 +98,15 @@ class TestMultipleSAMFASTAConverter(unittest.TestCase):
             '-CGC-CGATGACTGCTA',
             '--GA-CGAGAACAGCTA'
         ]
-        for j in range(12):
+        number_of_rows = len(desired_fasta)
+        number_of_columns = len(desired_fasta[0])
+        for j in range(number_of_columns):
             insertion_result = sam_fasta_converter.handle_insertions()
             if not insertion_result:
                 sam_fasta_converter.handle_deletions_and_matches()
             column = sam_fasta_converter.fasta[:, j]
             desired_column = [row[j] for row in desired_fasta]
-            triplets = zip(range(len(desired_column)), column, desired_column)
+            triplets = zip(range(number_of_rows), column, desired_column)
             for i, character, desired_character in triplets:
                 error_message = 'row %d, column %d' % (i, j)
                 self.assertEqual(character, desired_character, error_message)
