@@ -82,6 +82,12 @@ class AlignedSegment:
         if not self.entered:
             return '-'
 
+    def handle_insertion(self):
+        character = self.query_alignment_sequence[self.position_in_query]
+        self.advance()
+        return character
+
+
 
 class SAMFASTAConverter:
 
@@ -152,7 +158,7 @@ class SAMFASTAConverter:
         number_of_rows = len(self.aligned_segments)
         number_of_columns = 2*reference_length
         self.fasta = np.array(
-            [number_of_columns*[outer_gap_char] for _ in range(number_of_rows)],
+            [number_of_columns*['.'] for _ in range(number_of_rows)],
             dtype='<U1'
         )
         for segment in self.aligned_segments:
@@ -164,10 +170,17 @@ class SAMFASTAConverter:
     def handle_insertions(self):
         insertions = []
         for i, segment in enumerate(self.aligned_segments):
-            action = segment.current_cigar_tuple
+            action = segment.current_cigar_tuple[0]
             if action == 1:
-                insertion.append(i)
+                insertions.append(i)
         if len(insertions) > 0:
+            for i, segment in enumerate(self.aligned_segments):
+                action = segment.current_cigar_tuple[0]
+                if action == 1:
+                    character = segment.handle_insertion()
+                else:
+                    character = '-'
+                self.fasta[i, self.position_in_fasta] = character
             self.position_in_fasta += 1
             return True
         return False

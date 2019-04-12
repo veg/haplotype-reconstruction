@@ -42,27 +42,27 @@ class TestMultipleSAMFASTAConverter(unittest.TestCase):
         self.sam_fasta_converter = SAMFASTAConverter()
         self.mock_segments = [
             MockPysamAlignedSegment(
-                'ATCTGACGATTAC', # read 1
+                'ATCTCACGATTGC', # read 1
                 [(0, 13)],
                 0
             ),
             MockPysamAlignedSegment(
-                'CGCCGATAACGCT', # read 5
+                'CGCAGATAACGCT', # read 5
                 [(0, 1), (2, 1), (0, 12)],
                 2
             ),
             MockPysamAlignedSegment(
-                'CTGATCGATAAGCTA', # read 8
+                'CTGATCGCTAAGCTA', # read 8
                 [(0, 4), (1, 1), (0, 6), (2, 1), (0, 4)],
                 2
             ),
             MockPysamAlignedSegment(
-                'CGCCGATAACTGCTA', # read 11
+                'CGCCGATGACTGCTA', # read 11
                 [(0, 10), (1, 1), (0, 4)],
                 3
             ),
             MockPysamAlignedSegment(
-                'GACGATAACAGCTAAC', # read 14
+                'GACGAGAACAGCTAAC', # read 14
                 [(0, 9), (1, 1), (0, 6)],
                 4
             )
@@ -92,22 +92,20 @@ class TestMultipleSAMFASTAConverter(unittest.TestCase):
         sam_fasta_converter.initialize(self.mock_segments, reference_length, window_start)
 
         desired_fasta = [
-            'CTGA-CGATTAC-----',
-            'C-GC-CGATAAC-GCT-',
-            'CTGATCGATAA--GCTA',
-            '-CGC-CGATAACTGCTA',
-            '--GA-CGATAACAGCTA'
+            'CTCA-CGATTGC-----',
+            'C-GC-AGATAAC-GCT-',
+            'CTGATCGCTAA--GCTA',
+            '-CGC-CGATGACTGCTA',
+            '--GA-CGAGAACAGCTA'
         ]
-        for j in range(4):
+        for j in range(12):
             insertion_result = sam_fasta_converter.handle_insertions()
-            self.assertFalse(insertion_result)
-            sam_fasta_converter.handle_deletions_and_matches()
+            if not insertion_result:
+                sam_fasta_converter.handle_deletions_and_matches()
             column = sam_fasta_converter.fasta[:, j]
             desired_column = [row[j] for row in desired_fasta]
-            print(desired_column)
             triplets = zip(range(len(desired_column)), column, desired_column)
             for i, character, desired_character in triplets:
-                print(character, desired_character)
                 error_message = 'row %d, column %d' % (i, j)
                 self.assertEqual(character, desired_character, error_message)
 
