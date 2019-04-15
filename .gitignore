@@ -12,7 +12,6 @@ shorah/
 *.fas
 *.fai
 *.log
-data/
 output/
 test-data/
 shorah-tests/

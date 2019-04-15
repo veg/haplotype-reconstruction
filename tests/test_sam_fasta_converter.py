@@ -1,7 +1,9 @@
 import unittest
 import re
+import os
 
 import numpy as np
+import pandas as pd
 from Bio.SeqRecord import SeqRecord
 from Bio.Seq import Seq
 
@@ -54,6 +56,22 @@ class TestCigarStringToTuples(unittest.TestCase):
         for cigar_string, desired_cigar_tuple in cigar_pairs:
             cigar_tuple = cigar_string_to_tuples(cigar_string)
             self.assertEqual(cigar_tuple, desired_cigar_tuple)
+
+
+class TestValidSampleExcel(unittest.TestCase):
+    def setUp(self):
+        excel_filepath = os.path.join(os.getcwd(), 'tests', 'data', 'SAMtoFASTA.xlsx')
+        self.df = pd.read_excel(excel_filepath)
+    
+    def test_queries_match_alignment(self):
+        reads = self.df.iloc[3:23, 2:24]
+        queries = self.df.iloc[3:23, 24]
+        for i, read in reads.iterrows():
+            not_gap = read != '-'
+            valid_sites = not_gap & read.notna()
+            fasta_query = ''.join(read[valid_sites])
+            query = queries[i]
+            self.assertEqual(fasta_query, query, i)
 
 
 class TestSingleSAMFASTAConverter(unittest.TestCase):
