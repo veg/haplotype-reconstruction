@@ -32,7 +32,7 @@ class TestSingleSAMFASTAConverter(unittest.TestCase):
             [(0, 1), (1, 1), (2, 1), (0, 5), (2, 1), (0, 3)]
         )
         fasta = self.sam_fasta_converter.single_aligned_segment_to_fasta(segment)
-        desired_fasta = np.array(list('AC-TC-GAACTC'), dtype='<U1')
+        desired_fasta = np.array(list('AC-TCCTC-GAA'), dtype='<U1')
         self.assertTrue(np.all(fasta==desired_fasta))
 
 
@@ -47,23 +47,23 @@ class TestMultipleSAMFASTAConverter(unittest.TestCase):
                 0
             ),
             MockPysamAlignedSegment(
-                'CGCAGATAACGCT', # read 5
-                [(0, 1), (2, 1), (0, 12)],
+                'CGCAGATAACCT', # read 5
+                [(0, 1), (2, 1), (0, 11)],
                 2
             ),
             MockPysamAlignedSegment(
-                'CTGATCGCTAAGCTA', # read 8
-                [(0, 4), (1, 1), (0, 6), (2, 1), (0, 4)],
+                'CTGATCGCTAACTA', # read 8
+                [(0, 4), (1, 1), (0, 6), (2, 1), (0, 3)],
                 2
             ),
             MockPysamAlignedSegment(
                 'CGCCGATGACTGCTA', # read 11
-                [(0, 10), (1, 1), (0, 4)],
+                [(0, 10), (1, 2), (0, 3)],
                 3
             ),
             MockPysamAlignedSegment(
-                'GACGAGAACAGCTAAC', # read 14
-                [(0, 9), (1, 1), (0, 6)],
+                'GACGAGAACACTAAC', # read 14
+                [(0, 9), (1, 1), (0, 5)],
                 4
             )
         ]
@@ -85,7 +85,7 @@ class TestMultipleSAMFASTAConverter(unittest.TestCase):
         self.assertEqual(segments[3].current_character, '-')
         self.assertEqual(segments[4].current_character, '-')
 
-    def test_single_test_case(self):
+    def test_single_case(self):
         sam_fasta_converter = SAMFASTAConverter()
         reference_length = 20
         window_start = 2
@@ -93,10 +93,10 @@ class TestMultipleSAMFASTAConverter(unittest.TestCase):
 
         desired_fasta = [
             'CTCA-CGATTGC-----',
-            'C-GC-AGATAAC-GCT-',
-            'CTGATCGCTAA--GCTA',
+            'C-GC-AGATAAC--CT-',
+            'CTGATCGCTAA---CTA',
             '-CGC-CGATGACTGCTA',
-            '--GA-CGAGAACAGCTA'
+            '--GA-CGAGAACA-CTA'
         ]
         number_of_rows = len(desired_fasta)
         number_of_columns = len(desired_fasta[0])

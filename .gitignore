@@ -30,3 +30,4 @@ snakejob*
 *.bt2
 compartmentalization.json
 .RData
+*.pyc
