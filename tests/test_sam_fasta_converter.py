@@ -61,17 +61,28 @@ class TestCigarStringToTuples(unittest.TestCase):
 class TestValidSampleExcel(unittest.TestCase):
     def setUp(self):
         excel_filepath = os.path.join(os.getcwd(), 'tests', 'data', 'SAMtoFASTA.xlsx')
-        self.df = pd.read_excel(excel_filepath)
+        self.df = pd.read_excel(excel_filepath, header=None)
+        self.reads = self.df.iloc[3:23, 2:24]
+        self.reads[self.reads == '~'] = np.nan
     
     def test_queries_match_alignment(self):
-        reads = self.df.iloc[3:23, 2:24]
         queries = self.df.iloc[3:23, 24]
-        for i, read in reads.iterrows():
+        for i, read in self.reads.iterrows():
             not_gap = read != '-'
             valid_sites = not_gap & read.notna()
             fasta_query = ''.join(read[valid_sites])
             query = queries[i]
             self.assertEqual(fasta_query, query, i)
+
+    def test_reference_start_agreement(self):
+        offset = 2
+        reference_starts = self.df.iloc[3:23, 25]
+        for i, read in self.reads.iterrows():
+            reference_start = reference_starts[i]
+            fasta_reference_start = int(read.first_valid_index()) - offset
+            if i >= 20: # apply correction for first gap
+                fasta_reference_start -= 1
+            self.assertEqual(reference_start, fasta_reference_start, i)
 
 
 class TestSingleSAMFASTAConverter(unittest.TestCase):
@@ -141,21 +152,24 @@ class TestMultipleSAMFASTAConverter(unittest.TestCase):
         self.assertEqual(segments[0].current_character, 'C')
         self.assertEqual(segments[1].current_character, 'C')
         self.assertEqual(segments[2].current_character, 'C')
-        self.assertEqual(segments[3].current_character, '-')
-        self.assertEqual(segments[4].current_character, '-')
+        self.assertEqual(segments[3].current_character, '~')
+        self.assertEqual(segments[4].current_character, '~')
 
-    def test_single_case(self):
+    def test_partial_single_case(self):
         sam_fasta_converter = SAMFASTAConverter()
         reference_length = 20
         window_start = 2
-        sam_fasta_converter.initialize(self.mock_segments, reference_length, window_start)
+        window_end = 16
+        sam_fasta_converter.initialize(
+            self.mock_segments, reference_length, window_start, window_end
+        )
 
         desired_fasta = [
-            'CTCA-CGATTGC-----',
-            'C-GC-AGATAAC--CT-',
+            'CTCA-CGATTGC~~~~~',
+            'C-GC-AGATAAC--CT~',
             'CTGATCGCTAA---CTA',
-            '-CGC-CGATGACTGCTA',
-            '--GA-CGAGAACA-CTA'
+            '~CGC-CGATGACTGCTA',
+            '~~GA-CGAGAACA-CTA'
         ]
         number_of_rows = len(desired_fasta)
         number_of_columns = len(desired_fasta[0])
@@ -169,4 +183,26 @@ class TestMultipleSAMFASTAConverter(unittest.TestCase):
             for i, character, desired_character in triplets:
                 error_message = 'row %d, column %d' % (i, j)
                 self.assertEqual(character, desired_character, error_message)
+
+    def test_full_single_case(self):
+        excel_filepath = os.path.join(os.getcwd(), 'tests', 'data', 'SAMtoFASTA.xlsx')
+        df = pd.read_excel(excel_filepath, header=None)
+        desired_fasta = np.array(df.iloc[3:23, 4:21], dtype='<U1')
+        queries = df.loc[3:, 24]
+        reference_starts = df.loc[3:, 25]  
+        cigar_tuples = [cigar_string_to_tuples(cigar_string) for cigar_string in df.loc[3:, 27]]
+        triplets = zip(queries, cigar_tuples, reference_starts)
+        mock_segments = [
+            MockPysamAlignedSegment(query, cigar_tuple, reference_start)
+            for query, cigar_tuple, reference_start in triplets
+        ]
+
+        sam_fasta_converter = SAMFASTAConverter()
+        reference_length = 20
+        window_start = 2
+        window_end = 16
+        fasta = sam_fasta_converter.multiple_aligned_segments_in_window_to_fasta(
+            mock_segments, reference_length, window_start, window_end            
+        )
+        self.assertTrue(np.all(fasta == desired_fasta))
 

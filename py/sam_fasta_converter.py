@@ -3,17 +3,18 @@ import numpy as np
 
 class AlignedSegment:
 
-    def __init__(self, pysam_aligned_segment, window_start=0):
+    def __init__(self, pysam_aligned_segment, window_start=0, outer_gap_char='~'):
         self.pysam_aligned_segment = pysam_aligned_segment
         self.current_cigar_tuple_index = 0
         self.position_in_current_cigar_tuple = 0
         self.position_in_query = 0
         self.position_in_reference = pysam_aligned_segment.reference_start
+        self.outer_gap_char = outer_gap_char
         self.entered = False
         self.exited = False
 
     def __str__(self):
-        return 'PIQ: %d' % self.position_in_query
+        return 'AlignedSegment: PIQ=%d' % self.position_in_query
 
     @property
     def cigartuples(self):
@@ -30,7 +31,7 @@ class AlignedSegment:
     @property
     def current_character(self):
         if not self.entered or self.exited:
-            return '-'
+            return self.outer_gap_char
         return self.query_alignment_sequence[self.position_in_query]
 
     def advance(self):
@@ -70,7 +71,7 @@ class AlignedSegment:
 
     def handle_deletion_and_match(self, current_position_in_reference):
         if self.exited:
-            return '-'
+            return self.outer_gap_char
         if self.position_in_reference == current_position_in_reference:
             self.entered = True
         
@@ -83,14 +84,14 @@ class AlignedSegment:
             self.advance()
             return character
         if not self.entered:
-            return '-'
+            return self.outer_gap_char
 
     def handle_insertion(self):
         if not self.exited:
             character = self.query_alignment_sequence[self.position_in_query]
             self.advance()
             return character
-        return '-'
+        return self.outer_gap_char
 
 
 class SAMFASTAConverter:
@@ -153,12 +154,16 @@ class SAMFASTAConverter:
         stop = len(full_seq_np) - np.argmax(full_seq_np[::-1] != '-')
         return full_seq_np[start:stop]
 
-    def initialize(self, aligned_segments, reference_length, window_start, outer_gap_char='~'):
+    def initialize(self, aligned_segments, reference_length,
+            window_start, window_end, outer_gap_char='~'):
         self.aligned_segments = [
-            AlignedSegment(segment, window_start) for segment in aligned_segments
+            AlignedSegment(segment, window_start, outer_gap_char)
+            for segment in aligned_segments
         ]
         self.position_in_fasta = 0
         self.position_in_reference = window_start
+        self.outer_gap_char = outer_gap_char
+        self.window_end = window_end
         number_of_rows = len(self.aligned_segments)
         number_of_columns = 2*reference_length
         self.fasta = np.array(
@@ -169,7 +174,7 @@ class SAMFASTAConverter:
             segment.initiate_conversion(window_start)
 
     def should_continue(self):
-        pass
+        return self.position_in_reference < self.window_end
 
     def handle_insertions(self):
         insertions = []
@@ -181,8 +186,8 @@ class SAMFASTAConverter:
                 insertions.append(i)
         if len(insertions) > 0:
             for i, segment in enumerate(self.aligned_segments):
-                if segment.exited:
-                    character = '-'
+                if not segment.entered or segment.exited:
+                    character = self.outer_gap_char
                 else:
                     action = segment.current_cigar_tuple[0]
                     if action == 1:
@@ -207,11 +212,13 @@ class SAMFASTAConverter:
             reference_length, window_start, window_end, outer_gap_char='~'):
         self.aligned_segments = aligned_segments
         number_of_segments = len(aligned_segments)
-        self.initialize(reference_length, outer_gap_char)
+        self.initialize(aligned_segments, reference_length,
+            window_start, window_end, outer_gap_char)
         while self.should_continue():
             while self.handle_insertions():
                 pass
             self.handle_deletions_and_matches()
+        return self.fasta[:, :self.position_in_fasta]
         
     def embed_numeric_fasta(numeric_fasta):
         number_of_rows = numeric_fasta.shape[0]
