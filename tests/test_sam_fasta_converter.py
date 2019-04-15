@@ -1,4 +1,5 @@
 import unittest
+import re
 
 import numpy as np
 from Bio.SeqRecord import SeqRecord
@@ -13,6 +14,46 @@ class MockPysamAlignedSegment:
         self.query_alignment_sequence = alignment_sequence
         self.cigartuples = cigartuples
         self.reference_start = reference_start
+
+
+def cigar_string_to_tuples(cigar_string):
+    cigar_regex = re.compile('(\d+|[A-Z])');
+    tuple_atoms = list(filter(None, cigar_regex.split(cigar_string)))
+    lengths = [int(atom) for atom in tuple_atoms[::2]]
+    operation_encoding = { 'M': 0, 'I': 1, 'D': 2 }
+    operations = [operation_encoding[atom] for atom in tuple_atoms[1::2]]
+    cigar_tuples = list(zip(operations, lengths))
+    return cigar_tuples
+
+
+class TestCigarStringToTuples(unittest.TestCase):
+    def test_several_cigar_strings(self):
+        cigar_strings = [
+            '13M',
+            '9M1D3M',
+            '1M1D11M',
+            '14M',
+            '4M1I6M1D3M',
+            '10M2I3M',
+            '9M1I5M',
+            '8M1D3M',
+            '3M1D9M'
+        ]
+        desired_cigar_tuples = [
+            [(0, 13)],
+            [(0, 9), (2, 1), (0, 3)],
+            [(0, 1), (2, 1), (0, 11)],
+            [(0, 14)],
+            [(0, 4), (1, 1), (0, 6), (2, 1), (0, 3)],
+            [(0, 10), (1, 2), (0, 3)],
+            [(0, 9), (1, 1), (0, 5)],
+            [(0, 8), (2, 1), (0, 3)],
+            [(0, 3), (2, 1), (0, 9)]
+        ]
+        cigar_pairs = zip(cigar_strings, desired_cigar_tuples)
+        for cigar_string, desired_cigar_tuple in cigar_pairs:
+            cigar_tuple = cigar_string_to_tuples(cigar_string)
+            self.assertEqual(cigar_tuple, desired_cigar_tuple)
 
 
 class TestSingleSAMFASTAConverter(unittest.TestCase):
