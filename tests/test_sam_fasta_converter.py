@@ -58,15 +58,34 @@ class TestCigarStringToTuples(unittest.TestCase):
             self.assertEqual(cigar_tuple, desired_cigar_tuple)
 
 
+excel = {
+    'read_row_start': 3,
+    'read_row_end': 23,
+    'read_col_start': 2,
+    'read_col_end': 24,
+    'query_col': 24,
+    'reference_start_col': 25,
+    'cigar_col': 27,
+    'read_window_start': 4,
+    'read_window_end': 21
+}
+
+
 class TestValidSampleExcel(unittest.TestCase):
     def setUp(self):
         excel_filepath = os.path.join(os.getcwd(), 'tests', 'data', 'SAMtoFASTA.xlsx')
         self.df = pd.read_excel(excel_filepath, header=None)
-        self.reads = self.df.iloc[3:23, 2:24]
+        self.reads = self.df.iloc[
+            excel['read_row_start']: excel['read_row_end'],
+            excel['read_col_start']: excel['read_col_end']
+        ]
         self.reads[self.reads == '~'] = np.nan
     
     def test_queries_match_alignment(self):
-        queries = self.df.iloc[3:23, 24]
+        queries = self.df.iloc[
+            excel['read_row_start']: excel['read_row_end'],
+            excel['query_col']
+        ]
         for i, read in self.reads.iterrows():
             not_gap = read != '-'
             valid_sites = not_gap & read.notna()
@@ -76,7 +95,10 @@ class TestValidSampleExcel(unittest.TestCase):
 
     def test_reference_start_agreement(self):
         offset = 2
-        reference_starts = self.df.iloc[3:23, 25]
+        reference_starts = self.df.iloc[
+            excel['read_row_start']: excel['read_row_end'],
+            excel['reference_start_col']
+        ]
         for i, read in self.reads.iterrows():
             reference_start = reference_starts[i]
             fasta_reference_start = int(read.first_valid_index()) - offset
@@ -187,10 +209,19 @@ class TestMultipleSAMFASTAConverter(unittest.TestCase):
     def test_full_single_case(self):
         excel_filepath = os.path.join(os.getcwd(), 'tests', 'data', 'SAMtoFASTA.xlsx')
         df = pd.read_excel(excel_filepath, header=None)
-        desired_fasta = np.array(df.iloc[3:23, 4:21], dtype='<U1')
-        queries = df.loc[3:, 24]
-        reference_starts = df.loc[3:, 25]  
-        cigar_tuples = [cigar_string_to_tuples(cigar_string) for cigar_string in df.loc[3:, 27]]
+        desired_fasta = np.array(
+            df.iloc[
+                excel['read_row_start']: excel['read_row_end'],
+                excel['read_window_start'] : excel['read_window_end']
+            ],
+            dtype='<U1'
+        )
+        queries = df.loc[excel['read_row_start']:, excel['query_col']]
+        reference_starts = df.loc[excel['read_row_start']:, excel['reference_start_col']]  
+        cigar_strings = df.loc[excel['read_row_start']:, excel['cigar_col']]
+        cigar_tuples = [
+            cigar_string_to_tuples(cigar_string) for cigar_string in cigar_strings
+        ]
         triplets = zip(queries, cigar_tuples, reference_starts)
         mock_segments = [
             MockPysamAlignedSegment(query, cigar_tuple, reference_start)
