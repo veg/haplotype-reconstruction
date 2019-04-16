@@ -67,7 +67,8 @@ excel = {
     'reference_start_col': 25,
     'cigar_col': 27,
     'read_window_start': 4,
-    'read_window_end': 21
+    'read_window_end': 21,
+    'reference_position_row': 1
 }
 
 
@@ -217,7 +218,9 @@ class TestMultipleSAMFASTAConverter(unittest.TestCase):
             dtype='<U1'
         )
         queries = df.loc[excel['read_row_start']:, excel['query_col']]
-        reference_starts = df.loc[excel['read_row_start']:, excel['reference_start_col']]  
+        reference_starts = df.loc[
+            excel['read_row_start']:, excel['reference_start_col']
+        ]
         cigar_strings = df.loc[excel['read_row_start']:, excel['cigar_col']]
         cigar_tuples = [
             cigar_string_to_tuples(cigar_string) for cigar_string in cigar_strings
@@ -227,13 +230,20 @@ class TestMultipleSAMFASTAConverter(unittest.TestCase):
             MockPysamAlignedSegment(query, cigar_tuple, reference_start)
             for query, cigar_tuple, reference_start in triplets
         ]
+        desired_reference_position = np.array(df.iloc[
+            excel['reference_position_row'],
+            excel['read_window_start']: excel['read_window_end']
+        ], dtype=np.int)
 
         sam_fasta_converter = SAMFASTAConverter()
         reference_length = 20
         window_start = 2
         window_end = 16
-        fasta = sam_fasta_converter.multiple_aligned_segments_in_window_to_fasta(
-            mock_segments, reference_length, window_start, window_end            
+        fasta, reference_position = sam_fasta_converter.sam_window_to_fasta(
+            mock_segments, reference_length, window_start, window_end
         )
         self.assertTrue(np.all(fasta == desired_fasta))
+        self.assertTrue(np.all(
+            reference_position == desired_reference_position
+        ))
 

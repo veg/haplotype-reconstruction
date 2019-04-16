@@ -163,6 +163,7 @@ class SAMFASTAConverter:
         self.position_in_fasta = 0
         self.position_in_reference = window_start
         self.outer_gap_char = outer_gap_char
+        self.window_start = window_start
         self.window_end = window_end
         number_of_rows = len(self.aligned_segments)
         number_of_columns = 2*reference_length
@@ -170,11 +171,20 @@ class SAMFASTAConverter:
             [number_of_columns*['.'] for _ in range(number_of_rows)],
             dtype='<U1'
         )
+        self.reference_positions = np.zeros(
+            number_of_columns, dtype=np.int
+        )
         for segment in self.aligned_segments:
             segment.initiate_conversion(window_start)
 
     def should_continue(self):
         return self.position_in_reference < self.window_end
+
+    def record_reference_position(self, insertion):
+        adjustment = 1 if insertion else 0
+        index = self.position_in_fasta
+        value = self.position_in_reference - adjustment
+        self.reference_positions[index] = value
 
     def handle_insertions(self):
         insertions = []
@@ -184,7 +194,8 @@ class SAMFASTAConverter:
             action = segment.current_cigar_tuple[0]
             if action == 1:
                 insertions.append(i)
-        if len(insertions) > 0:
+        insertions_present = len(insertions) > 0
+        if insertions_present:
             for i, segment in enumerate(self.aligned_segments):
                 if not segment.entered or segment.exited:
                     character = self.outer_gap_char
@@ -195,6 +206,7 @@ class SAMFASTAConverter:
                     else:
                         character = '-'
                 self.fasta[i, self.position_in_fasta] = character
+            self.record_reference_position(True)
             self.position_in_fasta += 1
             return True
         return False
@@ -205,10 +217,11 @@ class SAMFASTAConverter:
                 self.position_in_reference
             )
             self.fasta[i, self.position_in_fasta] = character
+        self.record_reference_position(False)
         self.position_in_reference += 1
         self.position_in_fasta += 1
 
-    def multiple_aligned_segments_in_window_to_fasta(self, aligned_segments,
+    def sam_window_to_fasta(self, aligned_segments,
             reference_length, window_start, window_end, outer_gap_char='~'):
         self.aligned_segments = aligned_segments
         number_of_segments = len(aligned_segments)
@@ -218,7 +231,9 @@ class SAMFASTAConverter:
             while self.handle_insertions():
                 pass
             self.handle_deletions_and_matches()
-        return self.fasta[:, :self.position_in_fasta]
+        fasta = self.fasta[:, :self.position_in_fasta]
+        reference_position = self.reference_positions[:self.position_in_fasta]
+        return fasta, reference_position
         
     def embed_numeric_fasta(numeric_fasta):
         number_of_rows = numeric_fasta.shape[0]
