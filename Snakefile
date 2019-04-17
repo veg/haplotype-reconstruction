@@ -139,7 +139,7 @@ rule wgs_simulation:
     out="output/lanl/{lanl_id}/wgs"
   shell:
     """
-      art_illumina -rs 1 -ss HS25 --samout -i {input} -l 120 -s 50 -c 150000 -o {params.out}
+      art_illumina -rs 1 -ss HS25 --samout -i {input} -l 120 -s 50 -c 15000 -o {params.out}
       mv {params.out}.fq {output}
     """
 
@@ -158,6 +158,19 @@ rule simulate_wgs_dataset:
     fasta="output/wgs-simulation_{simulated_dataset}/truth.fasta"
   run:
     simulate_wgs_dataset(wildcards.simulated_dataset, output.fastq, output.fasta)
+
+rule wgs_simulation_truth:
+  input:
+    wgs=rules.simulate_wgs_dataset.output.fasta,
+    reference="input/references/{reference}.fasta"
+  output:
+    sam="output/wgs-simulation_{simulated_dataset}/{reference}_truth.sam",
+    fasta="output/wgs-simulation_{simulated_dataset}/{reference}_truth.fasta"
+  shell:
+    """
+      bealign -r {input.reference} {input.wgs} {output.sam}
+      bam2msa {output.sam} {output.fasta}
+    """
 
 rule all_lanl_genes:
   input:
@@ -335,15 +348,21 @@ rule sort_and_index:
   output:
     bam="output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.bam",
     sam="output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.sam",
-    fasta="output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.fasta",
     index="output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.bam.bai"
   shell:
     """
       samtools sort {input} > {output.bam}
       samtools view -h {output.bam} > {output.sam}
-      bam2msa {output.bam} {output.fasta}
       samtools index {output.bam}
     """
+
+rule sorted_fasta:
+  input:
+    rules.sort_and_index.output.bam
+  output:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.fasta"
+  shell:
+    "bam2msa {input} {output}"
 
 rule qualimap:
   input:
