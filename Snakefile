@@ -5,8 +5,6 @@ from py import extract_lanl_genome
 from py import simulate_amplicon_dataset 
 from py import simulate_wgs_dataset 
 
-from py import error_correction_io
-
 from py import evaluate
 from py import write_abayesqr_config
 from py import parse_abayesqr_output
@@ -19,7 +17,7 @@ with open('simulations.json') as simulation_file:
 with open('compartmentalization.json') as simulation_file:
   COMPARTMENT_INFORMATION = json.load(simulation_file)
 ACCESSION_NUMBERS = ['ERS6610%d' % i for i in range(87, 94)]
-SIMULATED_DATASETS = ['simulation_' + dataset for dataset in SIMULATION_INFORMATION.keys()]
+SIMULATED_DATASETS = ['wgs-simulation_' + dataset for dataset in SIMULATION_INFORMATION.keys()]
 RECONSTRUCTION_DATASETS = [
   "93US141_100k_14-159320-1GN-0_S16_L001_R1_001",
   "PP1L_S45_L001_R1_001",
@@ -32,18 +30,12 @@ REFERENCE_SUBSET = ["env", "pol", "gag"]
 HYPHY_PATH = "/Users/stephenshank/Software/lib/hyphy"
 HAPLOTYPERS = ["abayesqr", "savage", "regress_haplo", "quasirecomb"]
 
-rule dynamics_and_evolution:
+rule all_haplotypers:
   input:
-    expand(
-      "output/{dataset}/qfilt/bealign/{reference}/{haplotyper}/haplotypes.fasta",
-      dataset=ALL_DATASETS,
-      reference=["env", "gag", "pol"],
-      haplotyper=HAPLOTYPERS
-    ),
     expand(
       "output/{dataset}/fastp/bowtie2/{reference}/{haplotyper}/haplotypes.fasta",
       dataset=ALL_DATASETS,
-      reference=["env", "gag", "pol"],
+      reference=REFERENCE_SUBSET,
       haplotyper=HAPLOTYPERS
     ),
     expand(
@@ -53,12 +45,21 @@ rule dynamics_and_evolution:
     expand(
       "output/{dataset}/qfilt/bealign/{reference}/qualimapReport.html",
       dataset=ALL_DATASETS,
-      reference=["env", "gag", "pol"]
+      reference=REFERENCE_SUBSET
     ),
     expand(
       "output/{dataset}/fastp/bowtie2/{reference}/qualimapReport.html",
       dataset=ALL_DATASETS,
-      reference=["env", "gag", "pol"]
+      reference=REFERENCE_SUBSET
+    )
+
+rule all_bams:
+  input:
+    expand(
+      "output/{dataset}/fastp/bowtie2/{reference}/sorted.bam",
+      dataset=ALL_DATASETS,
+      reference=REFERENCE_SUBSET,
+      haplotyper=HAPLOTYPERS
     )
 
 ##################
@@ -532,14 +533,14 @@ rule readreduce:
 
 # ACME haplotype reconstruction
 
-rule error_correction:
-  input:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.bam"
-  output:
-    bam="output/{dataset}/{qc}/{read_mapper}/{reference}/error_corrected.bam",
-    csv="output/{dataset}/{qc}/{read_mapper}/{reference}/corrections.csv"
-  run:
-    error_correction_io(input[0], output.bam, output.csv)
+#rule error_correction:
+#  input:
+#    "output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.bam"
+#  output:
+#    bam="output/{dataset}/{qc}/{read_mapper}/{reference}/error_corrected.bam",
+#    csv="output/{dataset}/{qc}/{read_mapper}/{reference}/corrections.csv"
+#  run:
+#    error_correction_io(input[0], output.bam, output.csv)
 
 # Results
 
