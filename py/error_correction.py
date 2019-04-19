@@ -50,5 +50,10 @@ class ErrorCorrection:
             for character_index, character in enumerate(characters):
                 rows = positions[sequence == character]
                 counts[rows, character_index] += 1
-        return pd.DataFrame(counts, columns=characters)
+
+        df = pd.DataFrame(counts, columns=characters)
+        zeros = lambda character: (df[character] == 0).astype(np.int)
+        zero_cols = zeros('A') + zeros('C') + zeros('G') + zeros('T')
+        df['interesting'] = zero_cols < 3
+        return df
 
