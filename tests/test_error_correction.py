@@ -69,6 +69,7 @@ def get_pairs_to_test(threshold):
 
 class TestErrorCorrection(unittest.TestCase):
     threshold = 20
+    test_data = os.path.join(data_dir, 'sorted.bam')
     def test_single_read_count_data(self):
         segment = MockPysamAlignedSegment(
             'CTGATCGCTAACTA', # read 8
@@ -86,8 +87,7 @@ class TestErrorCorrection(unittest.TestCase):
         self.assertTrue(positions_agree)
 
     def test_real_nucleotide_counts(self):
-        bam_path = os.path.join(data_dir, 'sorted.bam')
-        bam = pysam.AlignmentFile(bam_path, 'rb')
+        bam = pysam.AlignmentFile(self.test_data, 'rb')
         error_correction = ErrorCorrection(bam)
         bam_counts = error_correction.nucleotide_counts()
         desired_columns = ['A', 'C', 'G', 'T', 'interesting']
@@ -96,9 +96,14 @@ class TestErrorCorrection(unittest.TestCase):
 
         fasta_subset = fasta_counts.loc[:, desired_columns]
         bam_subset = bam_counts.loc[:, desired_columns]
-        equality = fasta_subset == bam_subset
-        self.assertTrue(equality.all().all())
+        fasta_equals_bam = fasta_subset == bam_subset
+        self.assertTrue(fasta_equals_bam.all().all())
 
     def test_get_pairs_to_test(self):
-        pairs = get_pairs_to_test(self.threshold)
+        bam = pysam.AlignmentFile(self.test_data, 'rb')
+        desired_pairs = get_pairs_to_test(self.threshold)
+        error_correction = ErrorCorrection(bam)
+        pairs = error_correction.pairs_to_test(self.threshold)
+        alot_equal = (pairs.iloc[:20000] == desired_pairs[:20000]).all().all()
+        self.assertTrue(alot_equal)
 
