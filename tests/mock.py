@@ -11,17 +11,21 @@ excel_information = {
     'read_col_end': 24,
     'query_col': 24,
     'reference_start_col': 25,
+    'reference_end_col': 26,
     'cigar_col': 27,
     'read_window_start': 4,
     'read_window_end': 21,
-    'reference_position_row': 1
+    'reference_position_row': 1,
+    'insertion_columns': [8, 16, 17]
 }
 
 class MockPysamAlignedSegment:
-    def __init__(self, alignment_sequence, cigartuples, reference_start=None):
+    def __init__(self, alignment_sequence, cigartuples,
+            reference_start=None, reference_end=None):
         self.query_alignment_sequence = alignment_sequence
         self.cigartuples = cigartuples
         self.reference_start = reference_start
+        self.reference_end = reference_end
 
 
 class MockPysamAlignment:
@@ -54,6 +58,10 @@ def create_sample_alignment():
         excel_information['read_row_start']:,
         excel_information['reference_start_col']
     ]
+    reference_ends = df.loc[
+        excel_information['read_row_start']:,
+        excel_information['reference_end_col']
+    ]
     cigar_strings = df.loc[
         excel_information['read_row_start']:,
         excel_information['cigar_col']
@@ -61,10 +69,12 @@ def create_sample_alignment():
     cigar_tuples = [
         cigar_string_to_tuples(cigar_string) for cigar_string in cigar_strings
     ]
-    triplets = zip(queries, cigar_tuples, reference_starts)
     mock_segments = [
-        MockPysamAlignedSegment(query, cigar_tuple, reference_start)
-        for query, cigar_tuple, reference_start in triplets
+        MockPysamAlignedSegment(
+            query, cigar_tuple, reference_start, reference_end
+        )
+        for query, cigar_tuple, reference_start, reference_end
+        in zip(queries, cigar_tuples, reference_starts, reference_ends)
     ]
     alignment = MockPysamAlignment(mock_segments)
     return alignment

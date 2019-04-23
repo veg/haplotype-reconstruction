@@ -128,7 +128,7 @@ class SAMFASTAConverter:
             dtype=np.int
         )
 
-    def single_aligned_segment_to_fasta(self, aligned_segment):
+    def single_segment_to_fasta(self, aligned_segment, insertions=True):
         read_sequence = aligned_segment.query_alignment_sequence
         position = 0
         alignment = ''
@@ -141,7 +141,8 @@ class SAMFASTAConverter:
             insertion = action == 1
             deletion = action == 2
             if match or insertion:
-                alignment += read_sequence[position: position + stride]
+                if match or insertions:
+                    alignment += read_sequence[position: position + stride]
                 position += stride
             elif deletion:
                 if len(alignment) > 0 and i < number_of_cigar_tuples:
@@ -221,7 +222,7 @@ class SAMFASTAConverter:
         self.position_in_reference += 1
         self.position_in_fasta += 1
 
-    def sam_window_to_fasta(self, aligned_segments,
+    def sam_window_to_fasta_with_insertions(self, aligned_segments,
             reference_length, window_start, window_end, outer_gap_char='~'):
         self.aligned_segments = aligned_segments
         number_of_segments = len(aligned_segments)
@@ -234,6 +235,42 @@ class SAMFASTAConverter:
         fasta = self.fasta[:, :self.position_in_fasta]
         reference_position = self.reference_positions[:self.position_in_fasta]
         return fasta, reference_position
+
+    @staticmethod
+    def segment_in_window(window_start, window_end):
+        def segment_in_particular_window(segment):
+            ends_before_start = segment.reference_end < window_start
+            starts_after_end = segment.reference_start > window_end
+            return not ends_before_start and not starts_after_end 
+        return segment_in_particular_window
+
+    def pad_and_trim_segment(self, segment, window_start,
+            window_end, outer_gap_char='~'):
+        left_pad_amount = max(0, segment.reference_start - window_start)
+        right_pad_amount = max(0, window_end - segment.reference_end)
+        left_trim_amount = max(0, window_start - segment.reference_start)
+        right_trim_amount = max(0, segment.reference_end - window_end)
+        left_pad = np.array(left_pad_amount * [outer_gap_char], dtype='<U1')
+        right_pad = np.array(right_pad_amount * [outer_gap_char], dtype='<U1')
+        full_inner_fasta = self.single_segment_to_fasta(segment, False)
+        full_length = len(full_inner_fasta)
+        inner_fasta = full_inner_fasta[left_trim_amount:full_length-right_trim_amount]
+        return np.concatenate([left_pad, inner_fasta, right_pad])
+
+    def sam_window_to_fasta(self, aligned_segments, window_start,
+            window_end, outer_gap_char='~'):
+
+        segments = filter(
+            self.segment_in_window(window_start, window_end), 
+            aligned_segments.fetch()
+        )
+        return np.array([
+            self.pad_and_trim_segment(
+                segment, window_start,
+                window_end, outer_gap_char
+            )
+            for segment in segments
+        ])
         
     def embed_numeric_fasta(numeric_fasta):
         number_of_rows = numeric_fasta.shape[0]

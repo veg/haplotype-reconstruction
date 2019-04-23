@@ -27,6 +27,8 @@ total_reads = 0
 reads_with_insertion = 0
 reads_with_deletion = 0
 reads_with_nonzero_query_start = 0
+max_read_length = 0
+min_read_length = 100000
 for read in pysam_alignment.fetch():
     total_reads += 1
     saw_insertion = False
@@ -45,6 +47,8 @@ for read in pysam_alignment.fetch():
         reads_with_deletion += 1
     if read.query_alignment_start != 0:
         reads_with_nonzero_query_start += 1
+    max_read_length = max(max_read_length, read.infer_query_length())
+    min_read_length = min(min_read_length, read.infer_query_length())
 
 information['numberOfInsertions'] = len(information['insertions'])
 information['numberOfDeletions'] = len(information['deletions'])
@@ -52,4 +56,6 @@ information['totalNumberOfReads'] = total_reads
 information['numberOfReadsWithInsertions'] = reads_with_insertion
 information['numberOfReadsWithDeletions'] = reads_with_deletion
 information['numberOfReadsWithNonzeroQueryStart'] = reads_with_nonzero_query_start
+information['minimumReadLength'] = min_read_length
+information['maximumReadLength'] = max_read_length
 print(json.dumps(information, indent=2))
