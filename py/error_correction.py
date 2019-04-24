@@ -1,9 +1,69 @@
 import itertools as it
+from multiprocessing import Pool
 
 import pandas as pd
 import numpy as np
 from scipy.stats import fisher_exact
 import pysam
+
+from .sam_fasta_converter import SAMFASTAConverter
+
+
+def grouper(iterable, n, fillvalue=None):
+    args = [iter(iterable)] * n
+    return it.zip_longest(*args, fillvalue=fillvalue)
+
+
+def perform_partial_covariation_test(arguments):
+    pysam_path, pairs, i = arguments
+    pairs, pairs_for_max, pairs_for_min = it.tee(
+        it.filterfalse(lambda x: x is None, pairs),
+        3
+    )
+    print('   ...processing block %d...' % i)
+    pysam_alignment = pysam.AlignmentFile(pysam_path, 'rb')
+    pair_min = min([min(pair[0], pair[1]) for pair in pairs_for_min])
+    pair_max = max([max(pair[0], pair[1]) for pair in pairs_for_max])
+    sfc = SAMFASTAConverter()
+    fasta_window = sfc.sam_window_to_fasta(pysam_alignment, pair_min, pair_max+1)
+    results = []
+    for col_i, col_j in pairs:
+        idx_i = col_i - pair_min
+        idx_j = col_j - pair_min
+        i_char_counts = pd.Series(
+            fasta_window[:, idx_i]
+        ).value_counts().drop('~', errors='ignore')
+        i_chars = i_char_counts.index[i_char_counts > 0]
+
+        j_char_counts = pd.Series(
+            fasta_window[:, idx_j]
+        ).value_counts().drop('~', errors='ignore')
+        j_chars = j_char_counts.index[j_char_counts > 0]
+
+        content_i = fasta_window[:, idx_i] != '~'
+        content_j = fasta_window[:, idx_j] != '~'
+        valid = content_i & content_j
+        if valid.sum() == 0:
+            continue
+        for i_char, j_char in it.product(i_chars, j_chars):
+            equals_i = fasta_window[valid, idx_i] == i_char
+            equals_j = fasta_window[valid, idx_j] == j_char
+            X_11 = (equals_i & equals_j).sum()
+            X_21 = (~equals_i & equals_j).sum()
+            X_12 = (equals_i & ~equals_j).sum()
+            X_22 = (~equals_i & ~equals_j).sum()
+            
+            table = [
+                [X_11 , X_12],
+                [X_21 , X_22]
+            ]
+            _, p_value = fisher_exact(table)
+            results.append((col_i, col_j, i_char, j_char, p_value))
+    pysam_alignment.close()
+    print('   ...done block %d!' % i)
+    return pd.DataFrame(
+        results, columns=('col_i', 'col_j', 'i_char', 'j_char', 'p_value')
+    )
 
 
 class ErrorCorrection:
@@ -46,6 +106,7 @@ class ErrorCorrection:
         return sequence, positions
 
     def nucleotide_counts(self):
+        print('Obtaining nucleotide counts...')
         characters = ['A', 'C', 'G', 'T', '-']
         counts = np.zeros((self.reference_length, 5))
         for read in self.pysam_alignment.fetch():
@@ -59,44 +120,48 @@ class ErrorCorrection:
         zero_cols = zeros('A') + zeros('C') + zeros('G') + zeros('T')
         df['interesting'] = zero_cols < 3
         return df
-    
-    def pairs_to_test(self, threshold):
+
+    def get_pairs(self):
         counts = self.nucleotide_counts()
-        interesting_sites = np.array(counts.index[counts.interesting])
-        reads = self.pysam_alignment.fetch()
-        reference_starts = np.array(
-            [read.reference_start for read in reads],
-            dtype=np.int
-        )
-        reads = self.pysam_alignment.fetch()
-        reference_stops = np.array(
-            [read.reference_end for read in reads],
-            dtype=np.int
-        )
-        interesting_starts = np.searchsorted(
-            interesting_sites,
-            reference_starts
-        )
-        interesting_stops = np.searchsorted(
-            interesting_sites,
-            reference_stops
-        )
-        all_pairs = it.chain.from_iterable((
-            it.combinations(interesting_sites[start:stop], 2)
-            for start, stop in zip (interesting_starts, interesting_stops)
+        interesting = counts.index[counts.interesting]
+        max_read_length = max([
+            read.infer_query_length()
+            for read in self.pysam_alignment.fetch()
+        ])
+        pairs = list(filter(
+            lambda pair: pair[1] - pair[0] <= max_read_length,
+            it.combinations(interesting, 2)
         ))
-        columns = ['site_i', 'site_j']
-        all_counts = pd.DataFrame(
-            all_pairs, columns=columns
-        ).groupby(
-            columns
-        ).size().reset_index(name='count')
+        return pairs
+    
+    def perform_full_covariation_test(self, threshold=20, stride=10000,
+            ncpu=24, block_size=250, fdr=.001):
+        pairs = self.get_pairs()
+        arguments = [
+            (self.pysam_alignment.filename, group, i)
+            for i, group in enumerate(grouper(pairs, block_size))
+        ]
+        n_pairs = len(pairs)
+        n_blocks = len(arguments)
+        print('Processing %d blocks of %d pairs...' % (n_blocks, n_pairs))
+        pool = Pool(processes=ncpu)
+        result_dfs = pool.map(perform_partial_covariation_test, arguments)
+        result_df = pd.concat(result_dfs).sort_values(by='p_value')
+        pool.close()
+        print('...done!')
+        print('Performing multiple testing correction...')
+        m = len(result_df)
+        result_df['bh'] = result_df['p_value'] <= fdr*np.arange(1, m+1)/m
+        cutoff = (1-result_df['bh']).to_numpy().nonzero()[0][0]
+        covarying_sites = np.unique(
+            np.concatenate([
+                result_df['col_i'].iloc[:cutoff],
+                result_df['col_j'].iloc[:cutoff]
+            ])
+        )
+        covarying_sites.sort()
+        return covarying_sites
 
-        result = all_counts[
-            all_counts['count'] > 20
-        ].sort_values(
-            by=columns
-        )[columns].reset_index(drop=True)
-
-        return result
+    def __del__(self):
+        self.pysam_alignment.close()
 

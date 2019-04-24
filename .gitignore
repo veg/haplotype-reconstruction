@@ -18,3 +18,5 @@ compartmentalization.json
 .RData
 *.pyc
 .joblibcache
+*.ipynb
+.ipynb_checkpoints

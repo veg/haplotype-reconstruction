@@ -10,6 +10,7 @@ from joblib import Memory
 from tqdm import tqdm
 
 from py import ErrorCorrection
+from py import perform_partial_covariation_test
 from .mock import MockPysamAlignedSegment
 
 
@@ -70,6 +71,7 @@ def get_pairs_to_test(threshold):
 class TestErrorCorrection(unittest.TestCase):
     threshold = 20
     test_data = os.path.join(data_dir, 'sorted.bam')
+
     def test_single_read_count_data(self):
         segment = MockPysamAlignedSegment(
             'CTGATCGCTAACTA', # read 8
@@ -99,11 +101,15 @@ class TestErrorCorrection(unittest.TestCase):
         fasta_equals_bam = fasta_subset == bam_subset
         self.assertTrue(fasta_equals_bam.all().all())
 
-    def test_get_pairs_to_test(self):
+    def test_perform_partial_covariation_test(self):
         bam = pysam.AlignmentFile(self.test_data, 'rb')
-        desired_pairs = get_pairs_to_test(self.threshold)
         error_correction = ErrorCorrection(bam)
-        pairs = error_correction.pairs_to_test(self.threshold)
-        alot_equal = (pairs.iloc[:20000] == desired_pairs[:20000]).all().all()
-        self.assertTrue(alot_equal)
+        pairs = error_correction.get_pairs()
+        perform_partial_covariation_test((bam.filename, pairs[:1000], 1)) 
+
+    def test_perform_full_covariation_test(self):
+        bam = pysam.AlignmentFile(self.test_data, 'rb')
+        error_correction = ErrorCorrection(bam)
+        covarying_sites = error_correction.perform_full_covariation_test()
+        print(covarying_sites+1)
 
