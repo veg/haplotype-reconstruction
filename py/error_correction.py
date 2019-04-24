@@ -14,7 +14,7 @@ def grouper(iterable, n, fillvalue=None):
     return it.zip_longest(*args, fillvalue=fillvalue)
 
 
-def perform_partial_covariation_test(arguments):
+def partial_covariation_test(arguments):
     pysam_path, pairs, i = arguments
     pairs, pairs_for_max, pairs_for_min = it.tee(
         it.filterfalse(lambda x: x is None, pairs),
@@ -74,6 +74,10 @@ class ErrorCorrection:
         for read in pysam_alignment.fetch():
             self.number_of_reads += 1
 
+        self.covarying_sites = None
+        self.pairs = None
+        self.nucleotide_counts = None
+
     @staticmethod
     def read_count_data(read):
         sequence_length = np.array([
@@ -105,8 +109,10 @@ class ErrorCorrection:
         sequence = np.concatenate([list(segment) for segment in segments])
         return sequence, positions
 
-    def nucleotide_counts(self):
-        print('Obtaining nucleotide counts...')
+    def get_nucleotide_counts(self):
+        if not self.nucleotide_counts is None:
+            return self.nucleotide_counts
+        print('Calculating nucleotide counts...')
         characters = ['A', 'C', 'G', 'T', '-']
         counts = np.zeros((self.reference_length, 5))
         for read in self.pysam_alignment.fetch():
@@ -119,10 +125,17 @@ class ErrorCorrection:
         zeros = lambda character: (df[character] == 0).astype(np.int)
         zero_cols = zeros('A') + zeros('C') + zeros('G') + zeros('T')
         df['interesting'] = zero_cols < 3
+        df['nucleotide_max'] = df[['A', 'C', 'G', 'T']].max(axis=1)
+        df['consensus'] = '-'
+        for character in characters[:-1]:
+            df.loc[df['nucleotide_max'] == df[character], 'consensus'] = character
+        self.nucleotide_counts = df
         return df
 
     def get_pairs(self):
-        counts = self.nucleotide_counts()
+        if self.pairs:
+            return self.pairs
+        counts = self.get_nucleotide_counts()
         interesting = counts.index[counts.interesting]
         max_read_length = max([
             read.infer_query_length()
@@ -132,10 +145,13 @@ class ErrorCorrection:
             lambda pair: pair[1] - pair[0] <= max_read_length,
             it.combinations(interesting, 2)
         ))
+        self.pairs = pairs
         return pairs
     
-    def perform_full_covariation_test(self, threshold=20, stride=10000,
+    def full_covariation_test(self, threshold=20, stride=10000,
             ncpu=24, block_size=250, fdr=.001):
+        if self.covarying_sites:
+            return self.covarying_sites
         pairs = self.get_pairs()
         arguments = [
             (self.pysam_alignment.filename, group, i)
@@ -145,7 +161,7 @@ class ErrorCorrection:
         n_blocks = len(arguments)
         print('Processing %d blocks of %d pairs...' % (n_blocks, n_pairs))
         pool = Pool(processes=ncpu)
-        result_dfs = pool.map(perform_partial_covariation_test, arguments)
+        result_dfs = pool.map(partial_covariation_test, arguments)
         result_df = pd.concat(result_dfs).sort_values(by='p_value')
         pool.close()
         print('...done!')
@@ -160,7 +176,49 @@ class ErrorCorrection:
             ])
         )
         covarying_sites.sort()
+        self.covarying_sites = covarying_sites
         return covarying_sites
+
+    def corrected_reads(self, **kwargs):
+        nucleotide_counts = self.get_nucleotide_counts()
+        covarying_sites = self.full_covariation_test(**kwargs)
+        for read in self.pysam_alignment.fetch():
+            sequence, _ = self.read_count_data(read)
+            intraread_covarying_sites = covarying_sites[
+                (covarying_sites >= read.reference_start) &
+                (covarying_sites < read.reference_end)
+            ]
+            mask = np.ones(len(sequence), np.bool)
+            mask[intraread_covarying_sites - read.reference_start] = False
+            local_consensus = nucleotide_counts.consensus[
+                read.reference_start: read.reference_end
+            ]
+            sequence[mask] = local_consensus[mask]
+            
+            corrected_read = pysam.AlignedSegment()
+            corrected_read.query_name = read.query_name
+            corrected_read.query_sequence = ''.join(sequence)
+            corrected_read.flag = read.flag
+            corrected_read.reference_id = 0
+            corrected_read.reference_start = read.reference_start
+            corrected_read.mapping_quality = read.mapping_quality
+            corrected_read.cigar = [(0, len(sequence))]
+            corrected_read.next_reference_id = read.next_reference_id
+            corrected_read.next_reference_start = read.next_reference_start
+            corrected_read.template_length = read.template_length
+            corrected_read.query_qualities = pysam.qualitystring_to_array(
+                len(sequence) * '<'
+            )
+            corrected_read.tags = read.tags
+            yield corrected_read
+
+    def write_corrected_reads(self, output_bam_filename):
+        output_bam = pysam.AlignmentFile(
+            output_bam_filename, 'wb', header=self.pysam_alignment.header
+        )
+        for read in self.corrected_reads():
+            output_bam.write(read)
+        output_bam.close()
 
     def __del__(self):
         self.pysam_alignment.close()

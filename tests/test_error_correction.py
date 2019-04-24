@@ -10,7 +10,7 @@ from joblib import Memory
 from tqdm import tqdm
 
 from py import ErrorCorrection
-from py import perform_partial_covariation_test
+from py import partial_covariation_test
 from .mock import MockPysamAlignedSegment
 
 
@@ -91,7 +91,7 @@ class TestErrorCorrection(unittest.TestCase):
     def test_real_nucleotide_counts(self):
         bam = pysam.AlignmentFile(self.test_data, 'rb')
         error_correction = ErrorCorrection(bam)
-        bam_counts = error_correction.nucleotide_counts()
+        bam_counts = error_correction.get_nucleotide_counts()
         desired_columns = ['A', 'C', 'G', 'T', 'interesting']
 
         fasta_counts = get_fasta_counts()
@@ -101,15 +101,22 @@ class TestErrorCorrection(unittest.TestCase):
         fasta_equals_bam = fasta_subset == bam_subset
         self.assertTrue(fasta_equals_bam.all().all())
 
-    def test_perform_partial_covariation_test(self):
+    def test_partial_covariation_test(self):
         bam = pysam.AlignmentFile(self.test_data, 'rb')
         error_correction = ErrorCorrection(bam)
         pairs = error_correction.get_pairs()
-        perform_partial_covariation_test((bam.filename, pairs[:1000], 1)) 
+        partial_covariation_test((bam.filename, pairs[:1000], 1)) 
 
-    def test_perform_full_covariation_test(self):
+    def test_full_covariation_test(self):
         bam = pysam.AlignmentFile(self.test_data, 'rb')
         error_correction = ErrorCorrection(bam)
-        covarying_sites = error_correction.perform_full_covariation_test()
+        covarying_sites = error_correction.full_covariation_test()
         print(covarying_sites+1)
+
+    def test_write_corrected_reads(self):
+        corrected_bam_filename = 'corrected.bam'
+        bam = pysam.AlignmentFile(self.test_data, 'rb')
+        error_correction = ErrorCorrection(bam)
+        error_correction.write_corrected_reads(corrected_bam_filename)
+        os.remove(corrected_bam_filename)
 
