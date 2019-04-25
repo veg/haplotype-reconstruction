@@ -3,3 +3,4 @@ from .simulation import *
 from .utils import *
 from .error_correction import *
 from .sam_fasta_converter import *
+from .read_graph import *
