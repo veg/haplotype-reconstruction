@@ -110,7 +110,8 @@ class TestErrorCorrection(unittest.TestCase):
     def test_full_covariation_test(self):
         bam = pysam.AlignmentFile(self.test_data, 'rb')
         error_correction = ErrorCorrection(bam)
-        covarying_sites = error_correction.full_covariation_test()
+        error_correction.full_covariation_test()
+        covarying_sites = error_correction.multiple_testing_correction()
         print(covarying_sites+1)
 
     def test_write_corrected_reads(self):

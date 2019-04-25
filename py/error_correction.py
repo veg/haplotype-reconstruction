@@ -67,13 +67,17 @@ def partial_covariation_test(arguments):
 
 
 class ErrorCorrection:
-    def __init__(self, pysam_alignment):
+    def __init__(self, pysam_alignment, all_fe_tests=None):
         self.pysam_alignment = pysam_alignment
         self.reference_length = pysam_alignment.header['SQ'][0]['LN']
         self.number_of_reads = 0
         for read in pysam_alignment.fetch():
             self.number_of_reads += 1
 
+        if all_fe_tests:
+            self.all_fe_tests = pd.read_csv(all_fe_tests)
+        else:
+            self.all_fe_test = None
         self.covarying_sites = None
         self.pairs = None
         self.nucleotide_counts = None
@@ -149,7 +153,7 @@ class ErrorCorrection:
         return pairs
     
     def full_covariation_test(self, threshold=20, stride=10000,
-            ncpu=24, block_size=250, fdr=.001):
+            ncpu=24, block_size=250):
         if self.covarying_sites:
             return self.covarying_sites
         pairs = self.get_pairs()
@@ -162,17 +166,19 @@ class ErrorCorrection:
         print('Processing %d blocks of %d pairs...' % (n_blocks, n_pairs))
         pool = Pool(processes=ncpu)
         result_dfs = pool.map(partial_covariation_test, arguments)
-        result_df = pd.concat(result_dfs).sort_values(by='p_value')
         pool.close()
+        self.all_fe_tests = pd.concat(result_dfs).sort_values(by='p_value')
         print('...done!')
+
+    def multiple_testing_correction(self, fdr=.001):
         print('Performing multiple testing correction...')
-        m = len(result_df)
-        result_df['bh'] = result_df['p_value'] <= fdr*np.arange(1, m+1)/m
-        cutoff = (1-result_df['bh']).to_numpy().nonzero()[0][0]
+        m = len(self.all_fe_tests)
+        self.all_fe_tests['bh'] = self.all_fe_tests['p_value'] <= fdr*np.arange(1, m+1)/m
+        cutoff = (1-self.all_fe_tests['bh']).to_numpy().nonzero()[0][0]
         covarying_sites = np.unique(
             np.concatenate([
-                result_df['col_i'].iloc[:cutoff],
-                result_df['col_j'].iloc[:cutoff]
+                self.all_fe_tests['col_i'].iloc[:cutoff],
+                self.all_fe_tests['col_j'].iloc[:cutoff]
             ])
         )
         covarying_sites.sort()
@@ -181,7 +187,8 @@ class ErrorCorrection:
 
     def corrected_reads(self, **kwargs):
         nucleotide_counts = self.get_nucleotide_counts()
-        covarying_sites = self.full_covariation_test(**kwargs)
+        self.full_covariation_test(**kwargs)
+        covarying_sites = self.multiple_testing_correction()
         for read in self.pysam_alignment.fetch():
             sequence, _ = self.read_count_data(read)
             intraread_covarying_sites = covarying_sites[

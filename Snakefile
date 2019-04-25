@@ -1,6 +1,12 @@
 import os
 import json
 
+import pysam
+import pandas
+
+from py import error_correction_io
+from py import ErrorCorrection
+
 from py import extract_lanl_genome
 from py import simulate_amplicon_dataset 
 from py import simulate_wgs_dataset 
@@ -111,7 +117,7 @@ rule amplicon_simulation:
     out="output/lanl/{lanl_id}/{gene}/reads"
   shell:
     """
-      art_illumina -rs 1 -ss HS25 -i {input} -l 120 -s 50 -c 15000 -o {params.out}
+      art_illumina -rs 1 -ss HS25 -i {input} -l 120 -s 50 -c 150000 -o {params.out}
       mv {params.out}.fq {output}
     """
 
@@ -140,7 +146,7 @@ rule wgs_simulation:
     out="output/lanl/{lanl_id}/wgs"
   shell:
     """
-      art_illumina -rs 1 -ss HS25 --samout -i {input} -l 120 -s 50 -c 15000 -o {params.out}
+      art_illumina -rs 1 -ss HS25 --samout -i {input} -l 120 -s 50 -c 150000 -o {params.out}
       mv {params.out}.fq {output}
     """
 
@@ -249,7 +255,7 @@ rule qfilt:
     dir="output/{dataset}"
   shell:
     """
-      qfilt -Q {input} -q 15 -l 50 -j >> {output.fasta} 2>> {output.json}
+      qfilt -Q {input} -q 20 -l 50 -j >> {output.fasta} 2>> {output.json}
       fastqc {input} -o {params.dir}
     """
 
@@ -282,10 +288,14 @@ rule fastp:
     rules.situate_data.output[0]
   output:
     fastq="output/{dataset}/fastp/qc.fastq",
+    fasta="output/{dataset}/fastp/qc.fasta",
     json="output/{dataset}/fastp/qc.json",
     html="output/{dataset}/fastp/qc.html"
   shell:
-    "fastp -A -q 15 -i {input} -o {output.fastq} -j {output.json} -h {output.html}"
+    """
+      fastp -A -q 15 -i {input} -o {output.fastq} -j {output.json} -h {output.html}
+      cat {output.fastq} | paste - - - - | sed 's/^@/>/g'| cut -f1-2 | tr '\t' '\n' > {output.fasta}
+    """
 
 rule trimmomatic:
   input:
@@ -299,11 +309,11 @@ rule trimmomatic:
 
 rule bealign:
   input:
-    qc=rules.qfilt.output.fasta,
+    qc="output/{dataset}/{qc}/qc.fasta",
     reference="input/references/{reference}.fasta"
   output:
-    bam="output/{dataset}/qfilt/bealign/{reference}/mapped.bam",
-    discards="output/{dataset}/qfilt/bealign/{reference}/discards.fasta"
+    bam="output/{dataset}/{qc}/bealign/{reference}/mapped.bam",
+    discards="output/{dataset}/{qc}/bealign/{reference}/discards.fasta"
   shell:
     "bealign -r {input.reference} -e 0.5 -m HIV_BETWEEN_F -D {output.discards} -R {input.qc} {output.bam}"
 
@@ -533,14 +543,33 @@ rule readreduce:
 
 # ACME haplotype reconstruction
 
-#rule error_correction:
-#  input:
-#    "output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.bam"
-#  output:
-#    bam="output/{dataset}/{qc}/{read_mapper}/{reference}/error_corrected.bam",
-#    csv="output/{dataset}/{qc}/{read_mapper}/{reference}/corrections.csv"
-#  run:
-#    error_correction_io(input[0], output.bam, output.csv)
+rule error_correction:
+  input:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.bam"
+  output:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/corrected.bam"
+  run:
+    error_correction_io(input[0], output[0])
+
+rule error_correction_fasta:
+  input:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/corrected.bam"
+  output:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/corrected.fasta"
+  shell:
+    "bam2msa {input} {output}"
+
+rule all_fe_tests:
+  input:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.bam"
+  output:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/all_fe_tests.csv"
+  run:
+    alignment=pysam.AlignmentFile(input[0])
+    error_correction=ErrorCorrection(alignment)
+    error_correction.full_covariation_test()
+    error_correction.all_fe_tests.to_csv(output[0])
+    alignment.close()
 
 # Results
 

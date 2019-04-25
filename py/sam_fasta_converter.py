@@ -255,22 +255,24 @@ class SAMFASTAConverter:
         full_inner_fasta = self.single_segment_to_fasta(segment, False)
         full_length = len(full_inner_fasta)
         inner_fasta = full_inner_fasta[left_trim_amount:full_length-right_trim_amount]
-        return np.concatenate([left_pad, inner_fasta, right_pad])
+        fasta = np.concatenate([left_pad, inner_fasta, right_pad])
+        assert len(fasta) == window_end - window_start
+        return fasta
 
     def sam_window_to_fasta(self, aligned_segments, window_start,
             window_end, outer_gap_char='~'):
-
         segments = filter(
             self.segment_in_window(window_start, window_end), 
             aligned_segments.fetch()
         )
-        return np.array([
+        segments_np = np.array([
             self.pad_and_trim_segment(
                 segment, window_start,
                 window_end, outer_gap_char
             )
             for segment in segments
         ])
+        return segments_np
         
     def embed_numeric_fasta(numeric_fasta):
         number_of_rows = numeric_fasta.shape[0]
