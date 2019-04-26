@@ -1,6 +1,6 @@
 from collections import Counter
 
-import networkx
+import networkx as nx
 import pandas as pd
 import numpy as np
 
@@ -56,16 +56,55 @@ class SuperReadGraph:
                 all_superreads.append({
                     'vacs': vacs,
                     'weight': weight,
-                    'cv_start': covarying_boundaries[0],
-                    'cv_end': covarying_boundaries[1],
+                    'cv_start': int(covarying_boundaries[0]),
+                    'cv_end': int(covarying_boundaries[1]),
                 })
+        self.superreads = all_superreads
         return all_superreads
 
     def create_superread_graph(self):
-        pass
-
-    def transitive_reduction(self):
-        pass
+        superreads = self.obtain_superreads()
+        G = nx.DiGraph()
+        G.add_node('source')
+        G.add_node('target')
+        n_cv = len(self.covarying_sites)
+        for i, superread in enumerate(superreads):
+            G.add_node(i, **superread)
+            if superread['cv_start'] == 0:
+                G.add_edge('source', i)
+            if superread['cv_end'] == n_cv:
+                G.add_edge(i, 'target')
+        for i, superread_i in enumerate(superreads):
+            for j, superread_j in enumerate(superreads):
+                if i == j:
+                    continue
+                i_start = superread_i['cv_start']
+                i_end = superread_i['cv_end']
+                j_start = superread_j['cv_start']
+                j_end = superread_j['cv_end']
+                start_before_start = i_start <= j_start
+                start_before_end = j_start <= i_end
+                end_before_end = i_end <= j_end
+                if start_before_start and start_before_end and end_before_end:
+                    cv_start = max(i_start, j_start)
+                    cv_end = min(i_end, j_end)
+                    delta = cv_end - cv_start
+                    i_start = cv_start - i_start
+                    i_end = i_start + delta
+                    j_start = cv_start - j_start
+                    j_end = j_start + delta
+                    i_sequence = superread_i['vacs'][i_start:i_end]
+                    j_sequence = superread_j['vacs'][j_start:j_end]
+                    if i_sequence == j_sequence:
+                        G.add_edge(i, j)
+        did_not_connect = [
+            node 
+            for node in G.nodes
+            if len(list(G.pred[node])) == 0 and node != 'source'
+        ]
+        G.remove_nodes_from(did_not_connect)
+        self.superread_graph = nx.algorithms.dag.transitive_reduction(G)
+        self.superread_graph = G
 
     def candidate_haplotypes(self):
         pass
