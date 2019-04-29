@@ -3,6 +3,8 @@ from collections import Counter
 import networkx as nx
 import pandas as pd
 import numpy as np
+from Bio import SeqIO
+from scipy.stats import rankdata
 
 from .sam_fasta_converter import SAMFASTAConverter
 
@@ -44,7 +46,7 @@ class SuperReadGraph:
             for read in read_group:
                 fasta = sfc.single_segment_to_fasta(read)
                 covarying_sites_in_read = self.covarying_sites[
-                    covarying_boundaries[0]:covarying_boundaries[1]
+                    covarying_boundaries[0]: covarying_boundaries[1]
                 ]
                 corrected_sites = covarying_sites_in_read - read.reference_start
                 value_at_covarying_sites = ''.join(fasta[corrected_sites])
@@ -62,7 +64,10 @@ class SuperReadGraph:
         self.superreads = all_superreads
         return all_superreads
 
-    def create_superread_graph(self):
+    def get_aligned_superreads(self, reference, covarying_sites):
+        superreads = self.obtain_superreads()
+
+    def create(self):
         superreads = self.obtain_superreads()
         G = nx.DiGraph()
         G.add_node('source')
@@ -93,8 +98,8 @@ class SuperReadGraph:
                     i_end = i_start + delta
                     j_start = cv_start - j_start
                     j_end = j_start + delta
-                    i_sequence = superread_i['vacs'][i_start:i_end]
-                    j_sequence = superread_j['vacs'][j_start:j_end]
+                    i_sequence = superread_i['vacs'][i_start: i_end]
+                    j_sequence = superread_j['vacs'][j_start: j_end]
                     if i_sequence == j_sequence:
                         G.add_edge(i, j)
         did_not_connect = [
@@ -106,7 +111,21 @@ class SuperReadGraph:
         self.superread_graph = nx.algorithms.dag.transitive_reduction(G)
         self.superread_graph = G
 
+    def layout(self):
+        pos = nx.spring_layout(self.superread_graph)
+        node_data = pd.DataFrame([
+            (node_name, position[0], position[1])
+            for node_name, position in pos.items()
+        ], columns=['name', 'x', 'y_spring']).set_index('name')
+        not_source = node_data.index != 'source'
+        not_target = node_data.index != 'target'
+        actual_nodes = not_source & not_target
+        y = rankdata(node_data.loc[actual_nodes, 'y_spring'])
+        node_data.loc[actual_nodes, 'y'] = y
+        node_data.loc['source', 'y'] = 0
+        node_data.loc['target', 'y'] = len(y)
+        return node_data
+
     def candidate_haplotypes(self):
         pass
-    
 

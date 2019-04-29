@@ -5,6 +5,7 @@ import pysam
 import pandas
 
 from py import error_correction_io
+from py import superreads_io
 from py import ErrorCorrection
 
 from py import extract_lanl_genome
@@ -547,9 +548,10 @@ rule error_correction:
   input:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.bam"
   output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/corrected.bam"
+    bam="output/{dataset}/{qc}/{read_mapper}/{reference}/corrected.bam",
+    json="output/{dataset}/{qc}/{read_mapper}/{reference}/covarying_sites.json"
   run:
-    error_correction_io(input[0], output[0])
+    error_correction_io(input[0], output.bam, output.csv)
 
 rule error_correction_fasta:
   input:
@@ -570,6 +572,19 @@ rule all_fe_tests:
     error_correction.full_covariation_test()
     error_correction.all_fe_tests.to_csv(output[0])
     alignment.close()
+
+rule superread:
+  input:
+    bam=rules.error_correction.output.bam,
+    json=rules.error_correction.output.json,
+    reference=rules.situate_references.output[0]
+  output:
+    no_ref="output/{dataset}/{qc}/{read_mapper}/{reference}/superreads.fasta",
+    ref="output/{dataset}/{qc}/{read_mapper}/{reference}/superreads_reference.fasta",
+    json="output/{dataset}/{qc}/{read_mapper}/{reference}/superreads.json"
+  run:
+    superreads_io(input.reference, input.json, input.bam, output.no_ref, output.json)
+    shell("cat {input.reference} {output.no_ref} > {output.ref}")
 
 # Results
 
