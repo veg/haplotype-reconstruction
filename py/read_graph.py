@@ -83,31 +83,33 @@ class SuperReadGraph:
             for j, superread_j in enumerate(superreads):
                 if i == j:
                     continue
-                i_start = superread_i['cv_start']
-                i_end = superread_i['cv_end']
-                j_start = superread_j['cv_start']
-                j_end = superread_j['cv_end']
-                start_before_start = i_start <= j_start
-                start_before_end = j_start <= i_end
-                end_before_end = i_end <= j_end
+                i_cv_start = superread_i['cv_start']
+                i_cv_end = superread_i['cv_end']
+                j_cv_start = superread_j['cv_start']
+                j_cv_end = superread_j['cv_end']
+                start_before_start = i_cv_start <= j_cv_start
+                start_before_end = j_cv_start <= i_cv_end
+                end_before_end = i_cv_end <= j_cv_end
                 if start_before_start and start_before_end and end_before_end:
-                    cv_start = max(i_start, j_start)
-                    cv_end = min(i_end, j_end)
+                    cv_start = max(i_cv_start, j_cv_start)
+                    cv_end = min(i_cv_end, j_cv_end)
                     delta = cv_end - cv_start
-                    i_start = cv_start - i_start
-                    i_end = i_start + delta
-                    j_start = cv_start - j_start
+                    i_start = cv_start - i_cv_start
+                    i_end = i_cv_start + delta
+                    j_start = cv_start - j_cv_start
                     j_end = j_start + delta
                     i_sequence = superread_i['vacs'][i_start: i_end]
                     j_sequence = superread_j['vacs'][j_start: j_end]
                     if i_sequence == j_sequence:
                         G.add_edge(i, j)
-        did_not_connect = [
-            node 
-            for node in G.nodes
-            if len(list(G.pred[node])) == 0 and node != 'source'
-        ]
-        G.remove_nodes_from(did_not_connect)
+        did_not_connect = [None]
+        while len(did_not_connect) > 0:
+            did_not_connect = [
+                node
+                for node in G.nodes
+                if len(list(G.pred[node])) == 0 and node != 'source'
+            ]
+            G.remove_nodes_from(did_not_connect)
         self.superread_graph = nx.algorithms.dag.transitive_reduction(G)
         self.superread_graph = G
 

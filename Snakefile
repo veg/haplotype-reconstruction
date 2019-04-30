@@ -548,24 +548,26 @@ rule error_correction:
   input:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.bam"
   output:
-    bam="output/{dataset}/{qc}/{read_mapper}/{reference}/corrected.bam",
-    json="output/{dataset}/{qc}/{read_mapper}/{reference}/covarying_sites.json"
+    bam="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/corrected.bam",
+    index="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/corrected.bam.bai",
+    json="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/covarying_sites.json"
   run:
-    error_correction_io(input[0], output.bam, output.csv)
+    error_correction_io(input[0], output.bam, output.json)
+    shell("samtools index {output.bam}")
 
 rule error_correction_fasta:
   input:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/corrected.bam"
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/corrected.bam"
   output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/corrected.fasta"
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/corrected.fasta"
   shell:
     "bam2msa {input} {output}"
 
 rule all_fe_tests:
   input:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.bam"
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/sorted.bam"
   output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/all_fe_tests.csv"
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/all_fe_tests.csv"
   run:
     alignment=pysam.AlignmentFile(input[0])
     error_correction=ErrorCorrection(alignment)
@@ -579,9 +581,9 @@ rule superread:
     json=rules.error_correction.output.json,
     reference=rules.situate_references.output[0]
   output:
-    no_ref="output/{dataset}/{qc}/{read_mapper}/{reference}/superreads.fasta",
-    ref="output/{dataset}/{qc}/{read_mapper}/{reference}/superreads_reference.fasta",
-    json="output/{dataset}/{qc}/{read_mapper}/{reference}/superreads.json"
+    no_ref="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/superreads.fasta",
+    ref="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/superreads_reference.fasta",
+    json="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/superreads.json"
   run:
     superreads_io(input.reference, input.json, input.bam, output.no_ref, output.json)
     shell("cat {input.reference} {output.no_ref} > {output.ref}")
