@@ -582,10 +582,11 @@ rule superread:
     reference=rules.situate_references.output[0]
   output:
     no_ref="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/superreads.fasta",
+    cvs="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/superreads-cvs.fasta",
     ref="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/superreads_reference.fasta",
     json="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/superreads.json"
   run:
-    superreads_io(input.reference, input.json, input.bam, output.no_ref, output.json)
+    superreads_io(input.reference, input.json, input.bam, output.no_ref, output.cvs, output.json)
     shell("cat {input.reference} {output.no_ref} > {output.ref}")
 
 # Results

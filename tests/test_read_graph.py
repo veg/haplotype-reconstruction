@@ -26,5 +26,12 @@ class TestSuperReadGraph(unittest.TestCase):
         with open(self.json_path) as json_file:
             covarying_sites = np.array(json.load(json_file))
         superread_graph = SuperReadGraph(alignment, covarying_sites)
-        superread_graph.create_superread_graph()
+        superread_graph.create()
 
+    def test_candidate_haplotypes(self):
+        alignment = pysam.AlignmentFile(self.bam_path)
+        with open(self.json_path) as json_file:
+            covarying_sites = np.array(json.load(json_file))
+        superread_graph = SuperReadGraph(alignment, covarying_sites)
+        superread_graph.create()
+        superread_graph.candidate_haplotypes()

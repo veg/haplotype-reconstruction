@@ -22,7 +22,8 @@ def error_correction_io(input_bam, output_bam, output_json):
         )
 
 
-def superreads_io(input_reference, input_json, input_bam, output_fasta, output_json):
+def superreads_io(input_reference, input_json, input_bam,
+        output_full, output_cvs, output_json):
     with open(input_json) as json_file:
         covarying_sites = np.array(json.load(json_file), dtype=np.int)
     reference = SeqIO.read(input_reference, 'fasta')
@@ -49,7 +50,25 @@ def superreads_io(input_reference, input_json, input_bam, output_fasta, output_j
             id='superread-%d_weight-%d' % (i, info['weight']),
             description=''
         ))
-    SeqIO.write(superread_records, output_fasta, 'fasta')
+    SeqIO.write(superread_records, output_full, 'fasta')
+
+    superread_records = []
+    G = superread_graph.superread_graph
+    for node in G.nodes:
+        if node != 'source' and node != 'target':
+            info = G.nodes[node]
+            current_sequence = np.array(len(covarying_sites) * ['-'], dtype='<U1')
+            start = info['cv_start']
+            end = info['cv_end']
+            current_sequence[start: end] = np.array(
+                list(info['vacs']), dtype='<U1'
+            )
+            superread_records.append(SeqRecord(
+                Seq(''.join(current_sequence)),
+                id='superread-%d_weight-%d' % (node, info['weight']),
+                description=''
+            ))
+    SeqIO.write(superread_records, output_cvs, 'fasta')
 
     superread_json = {
         'info': superread_info,

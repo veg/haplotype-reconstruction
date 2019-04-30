@@ -129,5 +129,33 @@ class SuperReadGraph:
         return node_data
 
     def candidate_haplotypes(self):
-        pass
+        G = self.superread_graph
+        G.nodes['source']['candidate_haplotypes'] = np.array([[]], dtype='<U1')
+        G.nodes['source']['cv_end'] = 0
+        G.nodes['target']['cv_start'] = len(self.covarying_sites)
+        G.nodes['target']['vacs'] = ''
+        reverse_post_order = list(nx.dfs_postorder_nodes(G, 'source'))[::-1][1:]
+        i = 0
+        for descendant in reverse_post_order:
+            descendant_start = G.nodes[descendant]['cv_start']
+            vacs = G.nodes[descendant]['vacs']
+            extended_candidates = []
+            for ancestor in G.pred[descendant].keys():
+                ancestor_end = G.nodes[ancestor]['cv_end']
+                vacs_start_index = ancestor_end - descendant_start
+                vacs_np = np.array([list(vacs[vacs_start_index:])], dtype='<U1')
+                ancestor_candidates = G.nodes[ancestor]['candidate_haplotypes']
+                n_ancestor_candidates = ancestor_candidates.shape[0]
+                current_extended_candidates = np.hstack([
+                    ancestor_candidates,
+                    np.repeat(vacs_np, n_ancestor_candidates, axis=0)
+                ])
+                extended_candidates.append(current_extended_candidates)
+            candidate_haplotypes = np.unique(
+                np.vstack(extended_candidates), axis=0
+            )
+            i += 1
+            print('%d of %d' % (i, len(G.nodes)), candidate_haplotypes.shape[0])
+            G.nodes[descendant]['candidate_haplotypes'] = candidate_haplotypes
+        return G.nodes['target']['candidate_haplotypes']
 
