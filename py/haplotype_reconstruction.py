@@ -32,7 +32,7 @@ def superreads_io(input_reference, input_json, input_bam,
 
     superread_graph = SuperReadGraph(corrected_reads, covarying_sites)
     superread_info = superread_graph.obtain_superreads()
-    superread_graph.create()
+    superread_graph.create_full()
     layout = superread_graph.layout()
 
     superread_records = []
@@ -70,11 +70,35 @@ def superreads_io(input_reference, input_json, input_bam,
             ))
     SeqIO.write(superread_records, output_cvs, 'fasta')
 
+    superread_graph.reduce()
     superread_json = {
-        'info': superread_info,
         'layout': layout.to_dict('records'),
-        'links': nx.node_link_data(superread_graph.superread_graph)
+        'nodeLinkData': nx.node_link_data(superread_graph.superread_graph)
     }
     with open(output_json, 'w') as json_file:
         json.dump(superread_json, json_file, indent=2)
+
+
+def candidates_io(input_reference, input_graph_json, input_cvs_json, output_fasta):
+    with open(input_graph_json) as json_file:
+        superread_json = json.load(json_file)
+    with open(input_cvs_json) as json_file:
+        covarying_sites = np.array(json.load(json_file), dtype=np.int)
+    reference = SeqIO.read(input_reference, 'fasta')
+    reference_np = np.array(list(str(reference.seq)))
+    superread_graph = SuperReadGraph(
+        node_link_data=superread_json['nodeLinkData']
+    )
+
+    candidate_haplotypes = superread_graph.candidate_haplotypes()
+    superread_records = []
+    for i in range(candidate_haplotypes.shape[0]):
+        current_sequence = np.copy(reference_np)
+        current_sequence[covarying_sites] = candidate_haplotypes[i, :]
+        superread_records.append(SeqRecord(
+            Seq(''.join(current_sequence)),
+            id='candidate_%d' % i,
+            description=''
+        ))
+    SeqIO.write(superread_records, output_fasta, 'fasta')
 

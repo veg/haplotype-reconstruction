@@ -6,6 +6,7 @@ import pandas
 
 from py import error_correction_io
 from py import superreads_io
+from py import candidates_io
 from py import ErrorCorrection
 
 from py import extract_lanl_genome
@@ -588,6 +589,16 @@ rule superread:
   run:
     superreads_io(input.reference, input.json, input.bam, output.no_ref, output.cvs, output.json)
     shell("cat {input.reference} {output.no_ref} > {output.ref}")
+
+rule candidate_haplotypes:
+  input:
+    reference=rules.situate_references.output[0],
+    graph=rules.superread.output.json,
+    cvs=rules.error_correction.output.json
+  output:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/candidates.fasta",
+  run:
+    candidates_io(input.reference, input.graph, input.cvs, output[0])
 
 # Results
 

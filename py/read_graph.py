@@ -10,14 +10,17 @@ from .sam_fasta_converter import SAMFASTAConverter
 
 
 class SuperReadGraph:
-    def __init__(self, pysam_alignment=None, covarying_sites=None):
+    def __init__(self, pysam_alignment=None, covarying_sites=None, node_link_data=None):
         self.pysam_alignment = pysam_alignment
         self.covarying_sites = covarying_sites
+        if node_link_data:
+            self.superread_graph = nx.readwrite.json_graph.node_link_graph(
+                node_link_data, multigraph=False
+            )
+        else:
+            self.superread_graph = None
 
-        self.superreads = []
-        self.superread_graph = None
-
-    def obtain_superreads(self):
+    def obtain_superreads(self, minimum_weight=3):
         read_information = pd.DataFrame(
             [
                 (read.reference_start, read.reference_end)
@@ -41,6 +44,7 @@ class SuperReadGraph:
                 read_groups[key] = [read]
         all_superreads = []
         sfc = SAMFASTAConverter()
+        superread_index = 0
         for covarying_boundaries, read_group in read_groups.items():
             superreads = {}
             for read in read_group:
@@ -55,63 +59,92 @@ class SuperReadGraph:
                 else:
                     superreads[value_at_covarying_sites] = 1
             for vacs, weight in superreads.items():
-                all_superreads.append({
-                    'vacs': vacs,
-                    'weight': weight,
-                    'cv_start': int(covarying_boundaries[0]),
-                    'cv_end': int(covarying_boundaries[1]),
-                })
+                if weight >= minimum_weight:
+                    all_superreads.append({
+                        'index': superread_index,
+                        'vacs': vacs,
+                        'weight': weight,
+                        'cv_start': int(covarying_boundaries[0]),
+                        'cv_end': int(covarying_boundaries[1]),
+                        'discarded': False
+                    })
+                    superread_index += 1
         self.superreads = all_superreads
         return all_superreads
 
     def get_aligned_superreads(self, reference, covarying_sites):
         superreads = self.obtain_superreads()
 
-    def create(self):
-        superreads = self.obtain_superreads()
+    def check_compatability(self, superread_i, superread_j, minimum_overlap=2):
+        if superread_i['index'] == superread_j['index']:
+            return False
+        i_cv_start = superread_i['cv_start']
+        i_cv_end = superread_i['cv_end']
+        j_cv_start = superread_j['cv_start']
+        j_cv_end = superread_j['cv_end']
+        start_before_start = i_cv_start <= j_cv_start
+        start_before_end = j_cv_start < i_cv_end
+        end_before_end = i_cv_end <= j_cv_end
+        if start_before_start and start_before_end and end_before_end:
+            cv_start = max(i_cv_start, j_cv_start)
+            cv_end = min(i_cv_end, j_cv_end)
+            delta = cv_end - cv_start
+            i_start = cv_start - i_cv_start
+            i_end = i_start + delta
+            j_start = cv_start - j_cv_start
+            j_end = j_start + delta
+            i_sequence = superread_i['vacs'][i_start: i_end]
+            j_sequence = superread_j['vacs'][j_start: j_end]
+            agree_on_overlap = i_sequence == j_sequence
+            long_enough = len(i_sequence) >= minimum_overlap
+            return agree_on_overlap and long_enough
+        return False
+
+    def create_full(self, **kwargs):
+        superreads = self.obtain_superreads(**kwargs)
         G = nx.DiGraph()
         G.add_node('source')
         G.add_node('target')
         n_cv = len(self.covarying_sites)
-        for i, superread in enumerate(superreads):
-            G.add_node(i, **superread)
+        for superread in superreads:
+            G.add_node(superread['index'], **superread)
             if superread['cv_start'] == 0:
-                G.add_edge('source', i)
+                G.add_edge('source', superread['index'])
             if superread['cv_end'] == n_cv:
-                G.add_edge(i, 'target')
-        for i, superread_i in enumerate(superreads):
-            for j, superread_j in enumerate(superreads):
-                if i == j:
-                    continue
-                i_cv_start = superread_i['cv_start']
-                i_cv_end = superread_i['cv_end']
-                j_cv_start = superread_j['cv_start']
-                j_cv_end = superread_j['cv_end']
-                start_before_start = i_cv_start <= j_cv_start
-                start_before_end = j_cv_start <= i_cv_end
-                end_before_end = i_cv_end <= j_cv_end
-                if start_before_start and start_before_end and end_before_end:
-                    cv_start = max(i_cv_start, j_cv_start)
-                    cv_end = min(i_cv_end, j_cv_end)
-                    delta = cv_end - cv_start
-                    i_start = cv_start - i_cv_start
-                    i_end = i_cv_start + delta
-                    j_start = cv_start - j_cv_start
-                    j_end = j_start + delta
-                    i_sequence = superread_i['vacs'][i_start: i_end]
-                    j_sequence = superread_j['vacs'][j_start: j_end]
-                    if i_sequence == j_sequence:
-                        G.add_edge(i, j)
+                G.add_edge(superread['index'], 'target')
+        for superread_i in superreads:
+            for superread_j in superreads:
+                should_include_edge = self.check_compatability(
+                    superread_i, superread_j
+                )
+                if should_include_edge:
+                    G.add_edge(superread_i['index'], superread_j['index'])
+        self.superread_graph = G
+
+    def node_pruner(self, node):
+        G = self.superread_graph
+        starts_late = len(list(G.pred[node])) == 0 and node != 'source'
+        ends_early = len(list(G.succ[node])) == 0 and node != 'target'
+        return starts_late or ends_early
+
+    def reduce(self):
+        G = self.superread_graph
         did_not_connect = [None]
         while len(did_not_connect) > 0:
             did_not_connect = [
-                node
-                for node in G.nodes
-                if len(list(G.pred[node])) == 0 and node != 'source'
+                node for node in G.nodes if self.node_pruner(node)
             ]
+            print('Removing ', ' '.join([str(i) for i in did_not_connect]))
             G.remove_nodes_from(did_not_connect)
+            for node in did_not_connect:
+                self.superreads[node]['discarded'] = True
         self.superread_graph = nx.algorithms.dag.transitive_reduction(G)
-        self.superread_graph = G
+        for node in G.nodes:
+            self.superread_graph.nodes[node].update(G.nodes[node])
+
+    def create(self, **kwargs):
+        self.create_full(**kwargs)
+        self.reduce()
 
     def layout(self):
         pos = nx.spring_layout(self.superread_graph)
@@ -130,9 +163,13 @@ class SuperReadGraph:
 
     def candidate_haplotypes(self):
         G = self.superread_graph
+        number_of_covarying_sites = max(
+            [G.nodes[node]['cv_end'] for node in G.nodes if 'cv_end' in G.nodes[node]]
+        )
         G.nodes['source']['candidate_haplotypes'] = np.array([[]], dtype='<U1')
         G.nodes['source']['cv_end'] = 0
-        G.nodes['target']['cv_start'] = len(self.covarying_sites)
+        G.nodes['target']['cv_start'] = number_of_covarying_sites
+        G.nodes['target']['cv_end'] = number_of_covarying_sites
         G.nodes['target']['vacs'] = ''
         reverse_post_order = list(nx.dfs_postorder_nodes(G, 'source'))[::-1][1:]
         i = 0
@@ -155,7 +192,6 @@ class SuperReadGraph:
                 np.vstack(extended_candidates), axis=0
             )
             i += 1
-            print('%d of %d' % (i, len(G.nodes)), candidate_haplotypes.shape[0])
             G.nodes[descendant]['candidate_haplotypes'] = candidate_haplotypes
         return G.nodes['target']['candidate_haplotypes']
 
