@@ -11,7 +11,7 @@ from .error_correction import ErrorCorrection
 from .read_graph import SuperReadGraph
 
 
-def error_correction_io(input_bam, output_bam, output_json):
+def error_correction_io(input_bam, output_bam, output_json, output_consensus):
     alignment = pysam.AlignmentFile(input_bam, 'rb')
     error_correction = ErrorCorrection(alignment)
     error_correction.write_corrected_reads(output_bam)
@@ -20,14 +20,16 @@ def error_correction_io(input_bam, output_bam, output_json):
             [int(i) for i in error_correction.covarying_sites],
             json_file
         )
+    consensus_record = error_correction.consensus()
+    SeqIO.write(consensus_record, output_consensus, 'fasta')
 
 
-def superreads_io(input_reference, input_json, input_bam,
+def superreads_io(input_consensus, input_json, input_bam,
         output_full, output_cvs, output_json):
     with open(input_json) as json_file:
         covarying_sites = np.array(json.load(json_file), dtype=np.int)
-    reference = SeqIO.read(input_reference, 'fasta')
-    reference_np = np.array(list(str(reference.seq)))
+    consensus = SeqIO.read(input_consensus, 'fasta')
+    consensus_np = np.array(list(str(consensus.seq)))
     corrected_reads = pysam.AlignmentFile(input_bam, 'rb')
 
     superread_graph = SuperReadGraph(corrected_reads, covarying_sites)
@@ -37,10 +39,10 @@ def superreads_io(input_reference, input_json, input_bam,
 
     superread_records = []
     for i, info in enumerate(superread_info):
-        current_sequence = np.array(len(reference.seq) * ['-'], dtype='<U1')
+        current_sequence = np.array(len(consensus.seq) * ['-'], dtype='<U1')
         start = covarying_sites[info['cv_start']]
         end = covarying_sites[info['cv_end']-1]
-        current_sequence[start: end] = reference_np[start: end]
+        current_sequence[start: end] = consensus_np[start: end]
         covarying_indices = covarying_sites[info['cv_start']: info['cv_end']]
         current_sequence[covarying_indices] = np.array(
             list(info['vacs']), dtype='<U1'

@@ -551,9 +551,10 @@ rule error_correction:
   output:
     bam="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/corrected.bam",
     index="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/corrected.bam.bai",
-    json="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/covarying_sites.json"
+    json="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/covarying_sites.json",
+    consensus="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/consensus.fasta"
   run:
-    error_correction_io(input[0], output.bam, output.json)
+    error_correction_io(input[0], output.bam, output.json, output.consensus)
     shell("samtools index {output.bam}")
 
 rule error_correction_fasta:

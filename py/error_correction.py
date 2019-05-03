@@ -5,6 +5,9 @@ import pandas as pd
 import numpy as np
 from scipy.stats import fisher_exact
 import pysam
+from Bio import SeqIO
+from Bio.Seq import Seq
+from Bio.SeqRecord import SeqRecord
 
 from .sam_fasta_converter import SAMFASTAConverter
 
@@ -135,6 +138,11 @@ class ErrorCorrection:
             df.loc[df['nucleotide_max'] == df[character], 'consensus'] = character
         self.nucleotide_counts = df
         return df
+
+    def consensus(self):
+        consensus_sequence = Seq(''.join(self.nucleotide_counts['consensus']))
+        record = SeqRecord(consensus_sequence, id='consensus', description='')
+        return record
 
     def get_pairs(self):
         if self.pairs:
