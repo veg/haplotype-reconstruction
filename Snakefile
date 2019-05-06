@@ -2,7 +2,6 @@ import os
 import json
 
 import pysam
-import pandas
 
 from py import error_correction_io
 from py import superreads_io
@@ -12,6 +11,7 @@ from py import ErrorCorrection
 from py import extract_lanl_genome
 from py import simulate_amplicon_dataset 
 from py import simulate_wgs_dataset 
+from py import covarying_sites
 
 from py import evaluate
 from py import write_abayesqr_config
@@ -119,7 +119,7 @@ rule amplicon_simulation:
     out="output/lanl/{lanl_id}/{gene}/reads"
   shell:
     """
-      art_illumina -rs 1 -ss HS25 -i {input} -l 120 -s 50 -c 150000 -o {params.out}
+      art_illumina -rs 1 -ss HS25 -i {input} -l 120 -s 50 -c 15000 -o {params.out}
       mv {params.out}.fq {output}
     """
 
@@ -148,7 +148,7 @@ rule wgs_simulation:
     out="output/lanl/{lanl_id}/wgs"
   shell:
     """
-      art_illumina -rs 1 -ss HS25 --samout -i {input} -l 120 -s 50 -c 150000 -o {params.out}
+      art_illumina -rs 1 -ss HS25 --samout -i {input} -l 120 -s 50 -c 15000 -o {params.out}
       mv {params.out}.fq {output}
     """
 
@@ -168,7 +168,7 @@ rule simulate_wgs_dataset:
   run:
     simulate_wgs_dataset(wildcards.simulated_dataset, output.fastq, output.fasta)
 
-rule wgs_simulation_truth:
+rule wgs_simulation_true_sequences:
   input:
     wgs=rules.simulate_wgs_dataset.output.fasta,
     reference="input/references/{reference}.fasta"
@@ -180,6 +180,14 @@ rule wgs_simulation_truth:
       bealign -r {input.reference} {input.wgs} {output.sam}
       bam2msa {output.sam} {output.fasta}
     """
+
+rule wgs_simulation_true_covarying_sites:
+  input:
+    rules.wgs_simulation_true_sequences.output.fasta
+  output:
+    "output/wgs-simulation_{simulated_dataset}/{reference}_truth.json"
+  run:
+    covarying_sites(input[0], output[0])
 
 rule all_lanl_genes:
   input:
@@ -581,6 +589,7 @@ rule superread:
   input:
     bam=rules.error_correction.output.bam,
     json=rules.error_correction.output.json,
+    consensus=rules.error_correction.output.consensus,
     reference=rules.situate_references.output[0]
   output:
     no_ref="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/superreads.fasta",
@@ -588,18 +597,18 @@ rule superread:
     ref="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/superreads_reference.fasta",
     json="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/superreads.json"
   run:
-    superreads_io(input.reference, input.json, input.bam, output.no_ref, output.cvs, output.json)
+    superreads_io(input.consensus, input.json, input.bam, output.no_ref, output.cvs, output.json)
     shell("cat {input.reference} {output.no_ref} > {output.ref}")
 
 rule candidate_haplotypes:
   input:
-    reference=rules.situate_references.output[0],
+    consensus=rules.error_correction.output.consensus,
     graph=rules.superread.output.json,
     cvs=rules.error_correction.output.json
   output:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/candidates.fasta",
   run:
-    candidates_io(input.reference, input.graph, input.cvs, output[0])
+    candidates_io(input.consensus, input.graph, input.cvs, output[0])
 
 # Results
 

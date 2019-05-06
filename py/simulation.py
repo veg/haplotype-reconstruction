@@ -1,5 +1,6 @@
 import json
 
+import numpy as np
 from Bio import SeqIO
 
 
@@ -78,4 +79,18 @@ def evaluate(input_haplotypes, input_truth, output_json):
     }
     with open(output_json, 'w') as json_file:
         json.dump(output, json_file, indent=2)
+
+
+def covarying_sites(input_fasta, output_json):
+    fasta_np = np.array([
+        list(str(record.seq)) for record in SeqIO.parse(input_fasta, 'fasta')
+    ], dtype='<U1')
+    A_sum = np.sum(fasta_np == 'A', axis=0)
+    C_sum = np.sum(fasta_np == 'C', axis=0)
+    G_sum = np.sum(fasta_np == 'G', axis=0)
+    T_sum = np.sum(fasta_np == 'T', axis=0)
+    max_count = np.max(np.vstack([A_sum, C_sum, G_sum, T_sum]), axis=0)
+    covarying_sites = np.arange(fasta_np.shape[1])[max_count < fasta_np.shape[0]]
+    with open(output_json, 'w') as json_file:
+        json.dump([int(cvs) for cvs in covarying_sites], json_file)
 
