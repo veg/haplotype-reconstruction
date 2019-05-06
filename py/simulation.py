@@ -1,7 +1,10 @@
 import json
+from itertools import tee
 
 import numpy as np
 from Bio import SeqIO
+
+from .sam_fasta_converter import SAMFASTAConverter
 
 
 def extract_lanl_genome(lanl_input, lanl_id, fasta_output):
@@ -49,6 +52,17 @@ def simulate_wgs_dataset(dataset, output_fastq, output_fasta):
   SeqIO.write(simulated_reads, output_fastq, 'fastq')
   SeqIO.write(true_genomes, output_fasta, 'fasta')
 
+
+def create_numeric_fasta(records):
+    for_numeric, for_headers = tee(records, 2)
+    sfc = SAMFASTAConverter()
+    np_arrays = [
+        sfc.get_numeric_representation(record)
+        for record in for_numeric
+    ]
+    numeric = np.vstack(np_arrays)
+    headers = [record.id for record in for_headers]
+    return headers, numeric
 
 def evaluate(input_haplotypes, input_truth, output_json):
     haplotypes = SeqIO.parse(input_haplotypes, 'fasta')

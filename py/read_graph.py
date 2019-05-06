@@ -77,7 +77,7 @@ class SuperReadGraph:
 
     def check_compatability(self, superread_i, superread_j, minimum_overlap=2):
         if superread_i['index'] == superread_j['index']:
-            return False
+            return (False, 0)
         i_cv_start = superread_i['cv_start']
         i_cv_end = superread_i['cv_end']
         j_cv_start = superread_j['cv_start']
@@ -96,9 +96,11 @@ class SuperReadGraph:
             i_sequence = superread_i['vacs'][i_start: i_end]
             j_sequence = superread_j['vacs'][j_start: j_end]
             agree_on_overlap = i_sequence == j_sequence
-            long_enough = len(i_sequence) >= minimum_overlap
-            return agree_on_overlap and long_enough
-        return False
+            overlap = len(i_sequence)
+            long_enough = overlap >= minimum_overlap
+            compatible = agree_on_overlap and long_enough
+            return (compatible, overlap)
+        return (False, 0)
 
     def create_full(self, **kwargs):
         superreads = self.obtain_superreads(**kwargs)
@@ -114,11 +116,14 @@ class SuperReadGraph:
                 G.add_edge(superread['index'], 'target')
         for superread_i in superreads:
             for superread_j in superreads:
-                should_include_edge = self.check_compatability(
+                should_include_edge, overlap = self.check_compatability(
                     superread_i, superread_j
                 )
                 if should_include_edge:
-                    G.add_edge(superread_i['index'], superread_j['index'])
+                    G.add_edge(
+                        superread_i['index'], superread_j['index'],
+                        overlap=overlap
+                    )
         self.superread_graph = G
 
     def node_pruner(self, node):
@@ -129,6 +134,24 @@ class SuperReadGraph:
 
     def reduce(self):
         G = self.superread_graph
+
+        for node in G.nodes:
+            if node == 'source' or node == 'target':
+                continue
+            successors = [succ for succ in G.succ[node] if succ != 'target']
+            if len(successors) < 2:
+                continue
+            edges = [G.edges[node, succ] for succ in successors]
+            overlaps = [edge['overlap'] for edge in edges]
+            #min_overlap = min(overlaps)
+            #min_index = overlaps.index(min_overlap)
+            #G.remove_edge(node, successors[min_index])
+            max_overlap = max(overlaps)
+            max_index = overlaps.index(max_overlap)
+            for i, succ in enumerate(successors):
+                if i != max_index:
+                    G.remove_edge(node, succ)
+
         did_not_connect = [None]
         while len(did_not_connect) > 0:
             did_not_connect = [
@@ -137,10 +160,16 @@ class SuperReadGraph:
             print('Removing ', ' '.join([str(i) for i in did_not_connect]))
             G.remove_nodes_from(did_not_connect)
             for node in did_not_connect:
-                self.superreads[node]['discarded'] = True
+                try:
+                    self.superreads[node]['discarded'] = True
+                except TypeError:
+                    import pdb; pdb.set_trace()
         self.superread_graph = nx.algorithms.dag.transitive_reduction(G)
         for node in G.nodes:
             self.superread_graph.nodes[node].update(G.nodes[node])
+        for edge in self.superread_graph.edges:
+            source, target = edge
+            self.superread_graph.edges[source, target].update(G.edges[source, target])
 
     def create(self, **kwargs):
         self.create_full(**kwargs)
@@ -172,6 +201,16 @@ class SuperReadGraph:
         G.nodes['target']['cv_end'] = number_of_covarying_sites
         G.nodes['target']['vacs'] = ''
         reverse_post_order = list(nx.dfs_postorder_nodes(G, 'source'))[::-1][1:]
+
+        G.nodes['source']['npath'] = 1
+        for node in reverse_post_order:
+            number_of_current_paths = sum([
+                G.nodes[predecessor]['npath']
+                for predecessor in G.predecessors(node)
+            ])
+            G.nodes[node]['npath'] = number_of_current_paths
+        print('Obtaining', G.nodes['target']['npath'], 'candidate haplotypes...')
+
         i = 0
         for descendant in reverse_post_order:
             descendant_start = G.nodes[descendant]['cv_start']

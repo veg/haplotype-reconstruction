@@ -119,7 +119,7 @@ rule amplicon_simulation:
     out="output/lanl/{lanl_id}/{gene}/reads"
   shell:
     """
-      art_illumina -rs 1 -ss HS25 -i {input} -l 120 -s 50 -c 15000 -o {params.out}
+      art_illumina -rs 1 -ss HS25 -i {input} -l 120 -s 50 -c 150000 -o {params.out}
       mv {params.out}.fq {output}
     """
 
@@ -148,7 +148,7 @@ rule wgs_simulation:
     out="output/lanl/{lanl_id}/wgs"
   shell:
     """
-      art_illumina -rs 1 -ss HS25 --samout -i {input} -l 120 -s 50 -c 15000 -o {params.out}
+      art_illumina -rs 1 -ss HS25 --samout -i {input} -l 120 -s 50 -c 150000 -o {params.out}
       mv {params.out}.fq {output}
     """
 
@@ -609,6 +609,29 @@ rule candidate_haplotypes:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/candidates.fasta",
   run:
     candidates_io(input.consensus, input.graph, input.cvs, output[0])
+
+def truth_input(wildcards):
+  format_string = "output/%s/%s_truth.fasta"
+  parameters = (wildcards.dataset, wildcards.reference)
+  return format_string % parameters
+
+rule truth_and_candidates:
+  input:
+    candidates=rules.candidate_haplotypes.output[0],
+    truth=truth_input
+  output:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/truth_and_candidates.fasta"
+  shell:
+    "cat {input.truth} {input.candidates} > {output}"
+
+rule truth_and_candidates_diagnostics:
+  input:
+    candidates=rules.candidate_haplotypes.output[0],
+    truth=truth_input
+  output:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/truth_and_candidates.json"
+  run:
+    evaluate(input.candidates, input.truth, output[0])
 
 # Results
 
