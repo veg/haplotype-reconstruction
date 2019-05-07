@@ -612,9 +612,10 @@ rule candidate_haplotypes:
     graph=rules.superread.output.json,
     cvs=rules.error_correction.output.json
   output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/candidates.fasta",
+    fasta="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/candidates.fasta",
+    json="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/candidates.json"
   run:
-    candidates_io(input.consensus, input.graph, input.cvs, output[0])
+    candidates_io(input.consensus, input.graph, input.cvs, output.fasta, output.json)
 
 def reference_input(wildcards):
   format_string = "output/%s/%s_truth.fasta"

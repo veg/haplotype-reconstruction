@@ -34,5 +34,7 @@ class TestSuperReadGraph(unittest.TestCase):
             covarying_sites = np.array(json.load(json_file))
         superread_graph = SuperReadGraph(alignment, covarying_sites)
         superread_graph.create()
-        candidate_haplotypes = superread_graph.candidate_haplotypes()
+        candidate_haplotypes, describing_superreads = superread_graph.candidate_haplotypes()
         print(candidate_haplotypes.shape)
+        print(describing_superreads)
+

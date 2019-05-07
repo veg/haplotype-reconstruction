@@ -1,4 +1,4 @@
-from collections import Counter
+import itertools as it
 
 import networkx as nx
 import pandas as pd
@@ -58,12 +58,18 @@ class SuperReadGraph:
                     superreads[value_at_covarying_sites] += 1
                 else:
                     superreads[value_at_covarying_sites] = 1
-            for vacs, weight in superreads.items():
+            admission = lambda pair: pair[1] >= minimum_weight
+            admissible_superreads = list(filter(admission, superreads.items()))
+            total_weight = sum([
+                superread[1] for superread in admissible_superreads
+            ])
+            for vacs, weight in admissible_superreads:
                 if weight >= minimum_weight:
                     all_superreads.append({
                         'index': superread_index,
                         'vacs': vacs,
                         'weight': weight,
+                        'frequency': weight/total_weight,
                         'cv_start': int(covarying_boundaries[0]),
                         'cv_end': int(covarying_boundaries[1]),
                         'discarded': False
@@ -196,6 +202,7 @@ class SuperReadGraph:
             [G.nodes[node]['cv_end'] for node in G.nodes if 'cv_end' in G.nodes[node]]
         )
         G.nodes['source']['candidate_haplotypes'] = np.array([[]], dtype='<U1')
+        G.nodes['source']['describing_superreads'] = [[]]
         G.nodes['source']['cv_end'] = 0
         G.nodes['target']['cv_start'] = number_of_covarying_sites
         G.nodes['target']['cv_end'] = number_of_covarying_sites
@@ -211,26 +218,37 @@ class SuperReadGraph:
             G.nodes[node]['npath'] = number_of_current_paths
         print('Obtaining', G.nodes['target']['npath'], 'candidate haplotypes...')
 
-        i = 0
         for descendant in reverse_post_order:
             descendant_start = G.nodes[descendant]['cv_start']
             vacs = G.nodes[descendant]['vacs']
             extended_candidates = []
+            extended_describing_superreads = []
             for ancestor in G.pred[descendant].keys():
                 ancestor_end = G.nodes[ancestor]['cv_end']
                 vacs_start_index = ancestor_end - descendant_start
                 vacs_np = np.array([list(vacs[vacs_start_index:])], dtype='<U1')
                 ancestor_candidates = G.nodes[ancestor]['candidate_haplotypes']
+                ancestor_superreads = G.nodes[ancestor]['describing_superreads']
                 n_ancestor_candidates = ancestor_candidates.shape[0]
                 current_extended_candidates = np.hstack([
                     ancestor_candidates,
                     np.repeat(vacs_np, n_ancestor_candidates, axis=0)
                 ])
+                superread_extension = [descendant] if descendant != 'target' else []
+                current_extended_describing_superreads = [
+                    describing_list + superread_extension
+                    for describing_list in ancestor_superreads
+                ]
                 extended_candidates.append(current_extended_candidates)
-            candidate_haplotypes = np.unique(
-                np.vstack(extended_candidates), axis=0
-            )
-            i += 1
+                extended_describing_superreads.append(
+                    current_extended_describing_superreads
+                )
+            candidate_haplotypes = np.vstack(extended_candidates)
             G.nodes[descendant]['candidate_haplotypes'] = candidate_haplotypes
-        return G.nodes['target']['candidate_haplotypes']
+            G.nodes[descendant]['describing_superreads'] = list(
+                it.chain.from_iterable(extended_describing_superreads)
+            )
+        candidate_haplotypes = G.nodes['target']['candidate_haplotypes']
+        describing_superreads = G.nodes['target']['describing_superreads']
+        return candidate_haplotypes, describing_superreads
 
