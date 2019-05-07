@@ -81,7 +81,8 @@ def superreads_io(input_consensus, input_json, input_bam,
         json.dump(superread_json, json_file, indent=2)
 
 
-def candidates_io(input_consensus, input_graph_json, input_cvs_json, output_fasta):
+def candidates_io(input_consensus, input_graph_json, input_cvs_json,
+        output_fasta, output_json):
     with open(input_graph_json) as json_file:
         superread_json = json.load(json_file)
     with open(input_cvs_json) as json_file:
@@ -92,7 +93,7 @@ def candidates_io(input_consensus, input_graph_json, input_cvs_json, output_fast
         node_link_data=superread_json['nodeLinkData']
     )
 
-    candidate_haplotypes = superread_graph.candidate_haplotypes()
+    candidate_haplotypes, describing_superreads = superread_graph.candidate_haplotypes()
     superread_records = []
     for i in range(candidate_haplotypes.shape[0]):
         current_sequence = np.copy(consensus_np)
@@ -103,4 +104,7 @@ def candidates_io(input_consensus, input_graph_json, input_cvs_json, output_fast
             description=''
         ))
     SeqIO.write(superread_records, output_fasta, 'fasta')
+    
+    with open(output_json, 'w') as json_file:
+        json.dump(describing_superreads, json_file, indent=2)
 
