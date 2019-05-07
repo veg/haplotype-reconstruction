@@ -186,7 +186,7 @@ Further requirements listed in `environment.yml`.
 ### Install
 
 ```
-conda create -f environment.yml
+conda env create -f environment.yml
 conda activate haplotype-reconstruction
 ```
 

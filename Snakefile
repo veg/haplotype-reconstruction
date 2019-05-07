@@ -452,6 +452,12 @@ rule haploclique:
       mv {params.move} {output}
     """
 
+rule quasirecomb_jar:
+  output:
+    "QuasiRecomb.jar"
+  shell:
+    "wget https://github.com/cbg-ethz/QuasiRecomb/releases/download/v1.2/QuasiRecomb.jar"
+
 rule quasirecomb:
   input:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.bam"
@@ -461,7 +467,7 @@ rule quasirecomb:
     basedir="output/{dataset}/{qc}/{read_mapper}/{reference}/quasirecomb"
   shell:
     """
-      java -jar ~/QuasiRecomb.jar -conservative -o {params.basedir} -i {input}
+      java -jar QuasiRecomb.jar -conservative -o {params.basedir} -i {input}
       mv {params.basedir}/quasispecies.fasta {params.basedir}/haplotypes.fasta
     """
 
@@ -610,7 +616,7 @@ rule candidate_haplotypes:
   run:
     candidates_io(input.consensus, input.graph, input.cvs, output[0])
 
-def truth_input(wildcards):
+def reference_input(wildcards):
   format_string = "output/%s/%s_truth.fasta"
   parameters = (wildcards.dataset, wildcards.reference)
   return format_string % parameters
@@ -618,7 +624,7 @@ def truth_input(wildcards):
 rule truth_and_candidates:
   input:
     candidates=rules.candidate_haplotypes.output[0],
-    truth=truth_input
+    truth=reference_input
   output:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/truth_and_candidates.fasta"
   shell:
@@ -627,7 +633,7 @@ rule truth_and_candidates:
 rule truth_and_candidates_diagnostics:
   input:
     candidates=rules.candidate_haplotypes.output[0],
-    truth=truth_input
+    truth=reference_input
   output:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/truth_and_candidates.json"
   run:
@@ -646,7 +652,7 @@ rule acme_haplotype_dag:
 rule haplotypes_and_truth:
   input:
     haplotypes="output/{dataset}/{qc}/{read_mapper}/{reference}/{haplotyper}/haplotypes.fasta",
-    truth="output/{dataset}/{reference}/truth.fasta"
+    truth=reference_input
   output:
     unaligned="output/{dataset}/{qc}/{read_mapper}/{reference}/{haplotyper}/truth_and_haplotypes_unaligned.fasta",
     aligned="output/{dataset}/{qc}/{read_mapper}/{reference}/{haplotyper}/truth_and_haplotypes.fasta",

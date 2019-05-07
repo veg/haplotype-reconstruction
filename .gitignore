@@ -20,3 +20,4 @@ compartmentalization.json
 .joblibcache
 *.ipynb
 .ipynb_checkpoints
+*.jar
