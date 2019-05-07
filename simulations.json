@@ -31,6 +31,34 @@
       "frequency": 0.2
     }
   ],
+  "diverged_joint_triplet": [
+    {
+      "lanl_id": "B.CH.2002.HIV_CH_BID-V3527_2002.JQ403021",
+      "frequency": 0.33
+    },
+    {
+      "lanl_id": "B.US.2008.HIV_US_BID-V4123_2008.JQ403034",
+      "frequency": 0.33
+    },
+    {
+      "lanl_id": "B.US.2003.PRLS01.FJ469753",
+      "frequency": 0.34
+    }
+  ],
+  "diverged_joint_triplet_slightly_skewed": [
+    {
+      "lanl_id": "B.CH.2002.HIV_CH_BID-V3527_2002.JQ403021",
+      "frequency": 0.5
+    },
+    {
+      "lanl_id": "B.US.2008.HIV_US_BID-V4123_2008.JQ403034",
+      "frequency": 0.3
+    },
+    {
+      "lanl_id": "B.US.2003.PRLS01.FJ469753",
+      "frequency": 0.2
+    }
+  ],
   "related_1": [
     {
       "lanl_id": "B.KR.2005.05CSR3.DQ837381",

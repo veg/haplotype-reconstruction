@@ -1,18 +1,4 @@
-*.fasta
-*.qual
-*.new
-*.fastq
-*.fq
-*.aln
-*.tar
-*.tar.gz
-*.bam
-*.fna
 shorah/
-*.fas
-*.fai
-*.log
-data/
 output/
 test-data/
 shorah-tests/
@@ -30,3 +16,8 @@ snakejob*
 *.bt2
 compartmentalization.json
 .RData
+*.pyc
+.joblibcache
+*.ipynb
+.ipynb_checkpoints
+*.jar
