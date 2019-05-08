@@ -9,6 +9,7 @@ from Bio.SeqRecord import SeqRecord
 
 from .error_correction import ErrorCorrection
 from .read_graph import SuperReadGraph
+from .regression import perform_regression
 
 
 def error_correction_io(input_bam, output_bam, output_json, output_consensus):
@@ -107,4 +108,17 @@ def candidates_io(input_consensus, input_graph_json, input_cvs_json,
     
     with open(output_json, 'w') as json_file:
         json.dump(describing_superreads, json_file, indent=2)
+
+
+def regression_io(input_superreads, input_candidates, output_fasta):
+    with open(input_superreads) as superread_file:
+        superreads = json.load(superread_file)['nodeLinkData']['nodes']
+
+    with open(input_candidates) as candidates_file:
+        candidates = json.load(candidates_file)
+
+    perform_regression(superreads, candidates)
+
+    with open(output_fasta, 'w') as fasta_file:
+        fasta_file.write('to do')
 
