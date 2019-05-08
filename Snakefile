@@ -6,6 +6,7 @@ import pysam
 from py import error_correction_io
 from py import superreads_io
 from py import candidates_io
+from py import regression_io
 from py import ErrorCorrection
 
 from py import extract_lanl_genome
@@ -639,6 +640,15 @@ rule truth_and_candidates_diagnostics:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/truth_and_candidates.json"
   run:
     evaluate(input.candidates, input.truth, output[0])
+
+rule regression:
+  input:
+    superreads=rules.superread.output.json,
+    candidates=rules.candidate_haplotypes.output.json
+  output:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/haplotypes.fasta",
+  run:
+    regression_io(input.superreads, input.candidates, output[0])
 
 # Results
 
