@@ -21,3 +21,4 @@ compartmentalization.json
 *.ipynb
 .ipynb_checkpoints
 *.jar
+tags
