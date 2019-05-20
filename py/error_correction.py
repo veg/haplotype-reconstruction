@@ -4,6 +4,7 @@ from multiprocessing import Pool
 import pandas as pd
 import numpy as np
 from scipy.stats import fisher_exact
+from scipy.stats import binom
 import pysam
 from Bio import SeqIO
 from Bio.Seq import Seq
@@ -70,7 +71,7 @@ def partial_covariation_test(arguments):
 
 
 class ErrorCorrection:
-    def __init__(self, pysam_alignment, all_fe_tests=None):
+    def __init__(self, pysam_alignment, all_fe_tests=None, error_threshold=1e-3):
         self.pysam_alignment = pysam_alignment
         self.reference_length = pysam_alignment.header['SQ'][0]['LN']
         self.number_of_reads = 0
@@ -84,6 +85,7 @@ class ErrorCorrection:
         self.covarying_sites = None
         self.pairs = None
         self.nucleotide_counts = None
+        self.error_threshold = error_threshold
 
     @staticmethod
     def read_count_data(read):
@@ -133,6 +135,7 @@ class ErrorCorrection:
         zero_cols = zeros('A') + zeros('C') + zeros('G') + zeros('T')
         df['interesting'] = zero_cols < 3
         df['nucleotide_max'] = df[['A', 'C', 'G', 'T']].max(axis=1)
+        df['coverage'] = df[['A', 'C', 'G', 'T']].sum(axis=1)
         df['consensus'] = '-'
         for character in characters[:-1]:
             df.loc[df['nucleotide_max'] == df[character], 'consensus'] = character
@@ -191,7 +194,32 @@ class ErrorCorrection:
         )
         covarying_sites.sort()
         self.covarying_sites = covarying_sites
+        self.nucleotide_counts.loc[:, 'covarying'] = False
+        self.nucleotide_counts.loc[cvs, 'covarying'] = True
         return covarying_sites
+
+    def get_covarying_errors(self):
+        nucleotide_counts = self.get_nucleotide_counts()
+        summary = nucleotide_counts.loc[
+            nucleotide_counts.covarying==False,
+            ['nucleotide_max', 'coverage']
+        ].sum()
+        total_coverage = summary['coverage']
+        total_consensus = summary['nucleotide_max']
+        error_rate = np.abs(total_coverage - total_consensus) / total_consensus
+        nucleotide_counts.loc[:, 'n_error'] = nucleotide_counts.loc[:, 'coverage'].apply(
+            lambda count: binom.ppf(1-self.error_threshold, count, error_rate)
+        )
+        nucleotide_counts.loc[:, 'site'] = nucleotide_counts.index
+        nucleotide_counts.loc[:, 'covarying'] = False
+        nucleotide_counts.loc[self.covarying_sites, 'covarying'] = True
+        site_counts = nucleotide_counts.loc[nucleotide_counts['covarying'], :] \
+            .melt(id_vars=['n_error', 'site'], value_vars=['A', 'C', 'G', 'T'])
+        covarying_values = site_counts['value']
+        covarying_counts = site_counts['n_error']
+        significant = (covarying_values <= covarying_counts) & (covarying_values > 0)
+        desired_sites = site_counts.loc[significant, :].sort_values(by='site')
+        self.covarying_errors = desired_sites
 
     def corrected_reads(self, **kwargs):
         nucleotide_counts = self.get_nucleotide_counts()
