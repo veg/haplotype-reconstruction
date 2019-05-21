@@ -7,6 +7,7 @@ from Bio import SeqIO
 from scipy.stats import rankdata
 
 from .sam_fasta_converter import SAMFASTAConverter
+from .utils import read_reference_start_and_end
 
 
 class SuperReadGraph:
@@ -21,18 +22,8 @@ class SuperReadGraph:
             self.superread_graph = None
 
     def obtain_superreads(self, minimum_weight=3):
-        read_information = pd.DataFrame(
-            [
-                (read.reference_start, read.reference_end)
-                for read in self.pysam_alignment.fetch()
-            ],
-            columns=['reference_start', 'reference_end']
-        )
-        read_information['covarying_start'] = np.searchsorted(
-            self.covarying_sites, read_information['reference_start']
-        )
-        read_information['covarying_end'] = np.searchsorted(
-            self.covarying_sites, read_information['reference_end']
+        read_information = read_reference_start_and_end(
+            self.pysam_alignment, self.covarying_sites
         )
         read_groups = {}
         for i, read in enumerate(self.pysam_alignment.fetch()):
