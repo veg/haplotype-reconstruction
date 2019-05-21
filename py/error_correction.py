@@ -11,6 +11,7 @@ from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
 
 from .sam_fasta_converter import SAMFASTAConverter
+from .utils import read_reference_start_and_end
 
 
 def grouper(iterable, n, fillvalue=None):
@@ -195,7 +196,7 @@ class ErrorCorrection:
         covarying_sites.sort()
         self.covarying_sites = covarying_sites
         self.nucleotide_counts.loc[:, 'covarying'] = False
-        self.nucleotide_counts.loc[cvs, 'covarying'] = True
+        self.nucleotide_counts.loc[covarying_sites, 'covarying'] = True
         return covarying_sites
 
     def get_covarying_errors(self):
@@ -218,8 +219,31 @@ class ErrorCorrection:
         covarying_values = site_counts['value']
         covarying_counts = site_counts['n_error']
         significant = (covarying_values <= covarying_counts) & (covarying_values > 0)
-        desired_sites = site_counts.loc[significant, :].sort_values(by='site')
-        self.covarying_errors = desired_sites
+        covarying_errors = site_counts.loc[significant, :] \
+            .sort_values(by='site') \
+            .reset_index(drop=True)
+        self.covarying_errors = covarying_errors
+        return covarying_errors
+
+    def get_covarying_correction(read):
+        pass
+
+    def get_all_covarying_corrections(self):
+        covarying_errors = self.get_covarying_errors()
+        self.read_information = read_reference_start_and_end(
+            self.pysam_alignment, self.covarying_sites
+        )
+        corrections = {}
+        for read in self.pysam_alignment.fetch():
+            ce_start = (covarying_errors['site'] >= read.reference_start).idxmax()
+            ce_end = (covarying_errors['site'] >= read.reference_end).idxmax()-1
+            sequence, position = self.read_count_data(read)
+            unshifted_indices = covarying_errors.loc[ce_start:ce_end, 'site']
+            shifted_indices = unshifted_indices - read.reference_start
+            cv_sequence = sequence[shifted_indices]
+            cv_errors = covarying_errors.loc[ce_start:ce_end, 'variable']
+            if (cv_sequence == cv_errors).any():
+                corrections[read.query_name] = self.get_covarying_correction(read)
 
     def corrected_reads(self, **kwargs):
         nucleotide_counts = self.get_nucleotide_counts()

@@ -134,3 +134,20 @@ def add_subtype_information(input_csv, output_csv):
     df['Subtype2'] = df['ID2'].apply(lambda row: row.split('.')[0])
     df.to_csv(output_csv, index=False)
 
+
+def read_reference_start_and_end(pysam_alignment, covarying_sites):
+    read_information = pd.DataFrame(
+        [
+            (read.reference_start, read.reference_end)
+            for read in pysam_alignment.fetch()
+        ],
+        columns=['reference_start', 'reference_end']
+    )
+    read_information['covarying_start'] = np.searchsorted(
+        covarying_sites, read_information['reference_start']
+    )
+    read_information['covarying_end'] = np.searchsorted(
+        covarying_sites, read_information['reference_end']
+    )
+    return read_information
+
