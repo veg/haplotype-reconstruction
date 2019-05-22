@@ -4,7 +4,7 @@ from itertools import tee
 import numpy as np
 from Bio import SeqIO
 
-from .sam_fasta_converter import SAMFASTAConverter
+from .mapped_reads import MappedReads
 
 
 def extract_lanl_genome(lanl_input, lanl_id, fasta_output):
@@ -55,9 +55,9 @@ def simulate_wgs_dataset(dataset, output_fastq, output_fasta):
 
 def create_numeric_fasta(records):
     for_numeric, for_headers = tee(records, 2)
-    sfc = SAMFASTAConverter()
+    mr = MappedReads()
     np_arrays = [
-        sfc.get_numeric_representation(record)
+        mr.get_numeric_representation(record)
         for record in for_numeric
     ]
     numeric = np.vstack(np_arrays)

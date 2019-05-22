@@ -1,3 +1,4 @@
+import pysam
 import numpy as np
 
 
@@ -33,6 +34,14 @@ class AlignedSegment:
         if not self.entered or self.exited:
             return self.outer_gap_char
         return self.query_alignment_sequence[self.position_in_query]
+
+    @property
+    def reference_start(self):
+        return self.pysam_aligned_segment.reference_start
+
+    @property
+    def reference_end(self):
+        return self.pysam_aligned_segment.reference_end
 
     def advance(self):
         if not self.exited:
@@ -93,46 +102,11 @@ class AlignedSegment:
             return character
         return self.outer_gap_char
 
-
-class SAMFASTAConverter:
-
-    def __init__(self):
-        self.nucleotides = list('ACGTRYSWKMBDHVN-~')
-        self.n_nucleotides = len(self.nucleotides)
-        self.embedding = np.array([
-            [1,   0,   0,   0,   0,   0], # A
-            [0,   1,   0,   0,   0,   0], # C
-            [0,   0,   1,   0,   0,   0], # G
-            [0,   0,   0,   1,   0,   0], # T
-            [.5,  0,  .5,   0,   0,   0], # R
-            [0,   .5,  0,   .5,  0,   0], # Y
-            [0,   .5,  .5,  0,   0,   0], # S
-            [.5,  0,   0,   .5,  0,   0], # W
-            [0,   0,   .5,  .5,  0,   0], # K
-            [.5,  .5,  0,   0,   0,   0], # M
-            [0,   1/3, 1/3, 1/3, 0,   0], # B
-            [1/3, 0,   1/3, 1/3, 0,   0], # D
-            [1/3, 1/3, 0,   0/3, 0,   0], # H
-            [1/3, 1/3, 1/3, 0,   0,   0], # V
-            [.25, .25, .25, .25, 0,   0], # N
-            [0,   0,   0,   0,   1,   0], # -
-            [0,   0,   0,   0,   0,   1], # ~
-        ])
-        self.nuc2ind = {
-            nuc: i for i, nuc in enumerate(self.nucleotides)
-        }
-
-    def get_numeric_representation(self, record):
-        return np.array(
-            [self.nuc2ind[char] for char in record.seq],
-            dtype=np.int
-        )
-
-    def single_segment_to_fasta(self, aligned_segment, insertions=True):
-        read_sequence = aligned_segment.query_alignment_sequence
+    def to_fasta(self, insertions=True):
+        read_sequence = self.pysam_aligned_segment.query_alignment_sequence
         position = 0
         alignment = ''
-        cigar_tuples = aligned_segment.cigartuples
+        cigar_tuples = self.pysam_aligned_segment.cigartuples
         number_of_cigar_tuples = len(cigar_tuples)
         for i, cigar_tuple in enumerate(cigar_tuples):
             action = cigar_tuple[0]
@@ -155,18 +129,29 @@ class SAMFASTAConverter:
         stop = len(full_seq_np) - np.argmax(full_seq_np[::-1] != '-')
         return full_seq_np[start:stop]
 
-    def initialize(self, aligned_segments, reference_length,
-            window_start, window_end, outer_gap_char='~'):
-        self.aligned_segments = [
-            AlignedSegment(segment, window_start, outer_gap_char)
-            for segment in aligned_segments
+
+class MappedReads:
+
+    def __init__(self, pysam_alignment):
+        if type(pysam_alignment) == str:
+            extension = pysam_alignment.split('.')[-1]
+            mode = 'rb' if extension == 'bam' else 'sam'
+            pysam_alignment = pysam.AlignmentFile(pysam_alignment, mode)
+        self.reads = [
+            AlignedSegment(segment) for segment in pysam_alignment.fetch()
         ]
+
+    def fetch(self):
+        return self.reads
+
+    def initiate_conversion(self, reference_length,
+            window_start, window_end, outer_gap_char='~'):
         self.position_in_fasta = 0
         self.position_in_reference = window_start
         self.outer_gap_char = outer_gap_char
         self.window_start = window_start
         self.window_end = window_end
-        number_of_rows = len(self.aligned_segments)
+        number_of_rows = len(self.reads)
         number_of_columns = 2*reference_length
         self.fasta = np.array(
             [number_of_columns*['.'] for _ in range(number_of_rows)],
@@ -175,7 +160,7 @@ class SAMFASTAConverter:
         self.reference_positions = np.zeros(
             number_of_columns, dtype=np.int
         )
-        for segment in self.aligned_segments:
+        for segment in self.reads:
             segment.initiate_conversion(window_start)
 
     def should_continue(self):
@@ -189,7 +174,7 @@ class SAMFASTAConverter:
 
     def handle_insertions(self):
         insertions = []
-        for i, segment in enumerate(self.aligned_segments):
+        for i, segment in enumerate(self.reads):
             if segment.exited:
                 continue
             action = segment.current_cigar_tuple[0]
@@ -197,7 +182,7 @@ class SAMFASTAConverter:
                 insertions.append(i)
         insertions_present = len(insertions) > 0
         if insertions_present:
-            for i, segment in enumerate(self.aligned_segments):
+            for i, segment in enumerate(self.reads):
                 if not segment.entered or segment.exited:
                     character = self.outer_gap_char
                 else:
@@ -213,7 +198,7 @@ class SAMFASTAConverter:
         return False
 
     def handle_deletions_and_matches(self):
-        for i, segment in enumerate(self.aligned_segments):
+        for i, segment in enumerate(self.reads):
             character = segment.handle_deletion_and_match(
                 self.position_in_reference
             )
@@ -222,11 +207,10 @@ class SAMFASTAConverter:
         self.position_in_reference += 1
         self.position_in_fasta += 1
 
-    def sam_window_to_fasta_with_insertions(self, aligned_segments,
-            reference_length, window_start, window_end, outer_gap_char='~'):
-        self.aligned_segments = aligned_segments
-        number_of_segments = len(aligned_segments)
-        self.initialize(aligned_segments, reference_length,
+    def sam_window_to_fasta_with_insertions(self, reference_length,
+            window_start, window_end, outer_gap_char='~'):
+        number_of_segments = len(self.reads)
+        self.initiate_conversion(reference_length,
             window_start, window_end, outer_gap_char)
         while self.should_continue():
             while self.handle_insertions():
@@ -252,18 +236,18 @@ class SAMFASTAConverter:
         right_trim_amount = max(0, segment.reference_end - window_end)
         left_pad = np.array(left_pad_amount * [outer_gap_char], dtype='<U1')
         right_pad = np.array(right_pad_amount * [outer_gap_char], dtype='<U1')
-        full_inner_fasta = self.single_segment_to_fasta(segment, False)
+        full_inner_fasta = segment.to_fasta(False)
         full_length = len(full_inner_fasta)
         inner_fasta = full_inner_fasta[left_trim_amount:full_length-right_trim_amount]
         fasta = np.concatenate([left_pad, inner_fasta, right_pad])
         assert len(fasta) == window_end - window_start
         return fasta
 
-    def sam_window_to_fasta(self, aligned_segments, window_start,
+    def sam_window_to_fasta(self, window_start,
             window_end, outer_gap_char='~'):
         segments = filter(
             self.segment_in_window(window_start, window_end), 
-            aligned_segments.fetch()
+            self.reads
         )
         segments_np = np.array([
             self.pad_and_trim_segment(
@@ -274,13 +258,3 @@ class SAMFASTAConverter:
         ])
         return segments_np
         
-    def embed_numeric_fasta(numeric_fasta):
-        number_of_rows = numeric_fasta.shape[0]
-        number_of_molecules = numeric_fasta.shape[1]
-        size_of_embedding = self.embedding.shape[1]
-        number_of_columns = number_of_molecules*size_of_embedding
-        embedded_fasta = np.reshape(
-            embedding[numeric_fasta, :],
-            newshape=(number_of_rows, number_of_columns) 
-        )
-
