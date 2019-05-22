@@ -10,7 +10,7 @@ from Bio import SeqIO
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
 
-from .sam_fasta_converter import SAMFASTAConverter
+from .mapped_reads import MappedReads
 from .utils import read_reference_start_and_end
 
 
@@ -29,8 +29,8 @@ def partial_covariation_test(arguments):
     pysam_alignment = pysam.AlignmentFile(pysam_path, 'rb')
     pair_min = min([min(pair[0], pair[1]) for pair in pairs_for_min])
     pair_max = max([max(pair[0], pair[1]) for pair in pairs_for_max])
-    sfc = SAMFASTAConverter()
-    fasta_window = sfc.sam_window_to_fasta(pysam_alignment, pair_min, pair_max+1)
+    mr = MappedReads(pysam_alignment)
+    fasta_window = mr.sam_window_to_fasta(pair_min, pair_max+1)
     results = []
     for col_i, col_j in pairs:
         idx_i = col_i - pair_min

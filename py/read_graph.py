@@ -6,13 +6,13 @@ import numpy as np
 from Bio import SeqIO
 from scipy.stats import rankdata
 
-from .sam_fasta_converter import SAMFASTAConverter
+from .mapped_reads import MappedReads
 from .utils import read_reference_start_and_end
 
 
 class SuperReadGraph:
-    def __init__(self, pysam_alignment=None, covarying_sites=None, node_link_data=None):
-        self.pysam_alignment = pysam_alignment
+    def __init__(self, mapped_reads=None, covarying_sites=None, node_link_data=None):
+        self.mapped_reads = mapped_reads
         self.covarying_sites = covarying_sites
         if node_link_data:
             self.superread_graph = nx.readwrite.json_graph.node_link_graph(
@@ -23,10 +23,10 @@ class SuperReadGraph:
 
     def obtain_superreads(self, minimum_weight=3):
         read_information = read_reference_start_and_end(
-            self.pysam_alignment, self.covarying_sites
+            self.mapped_reads, self.covarying_sites
         )
         read_groups = {}
-        for i, read in enumerate(self.pysam_alignment.fetch()):
+        for i, read in enumerate(self.mapped_reads.reads):
             row = read_information.iloc[i, :]
             key = (row['covarying_start'], row['covarying_end'])
             if key in read_groups:
@@ -34,12 +34,11 @@ class SuperReadGraph:
             else:
                 read_groups[key] = [read]
         all_superreads = []
-        sfc = SAMFASTAConverter()
         superread_index = 0
         for covarying_boundaries, read_group in read_groups.items():
             superreads = {}
             for read in read_group:
-                fasta = sfc.single_segment_to_fasta(read)
+                fasta = read.to_fasta()
                 covarying_sites_in_read = self.covarying_sites[
                     covarying_boundaries[0]: covarying_boundaries[1]
                 ]

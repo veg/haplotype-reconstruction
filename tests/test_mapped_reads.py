@@ -7,44 +7,36 @@ import pandas as pd
 from Bio.SeqRecord import SeqRecord
 from Bio.Seq import Seq
 
-from py import SAMFASTAConverter
+from py import MappedReads
 from py import AlignedSegment
 from .mock import MockPysamAlignedSegment
+from .mock import MockPysamAlignment
 from .mock import excel_information as excel
 from .mock import create_sample_alignment
 from .mock import excel_filepath
 
 
-class TestSingleSAMFASTAConverter(unittest.TestCase):
-
-    def setUp(self):
-        self.sfc = SAMFASTAConverter()
-
-    def test_get_numeric_representation(self):
-        seq = Seq('ACGGCAT')
-        record = SeqRecord(seq)
-        result = self.sfc.get_numeric_representation(record)
-        desired_result = np.array([0, 1, 2, 2, 1, 0, 3], dtype=np.int)
+class TestAlignedSegment(unittest.TestCase):
 
     def test_single_segment_to_fasta(self):
-        segment = MockPysamAlignedSegment(
+        mock_segment = MockPysamAlignedSegment(
             'ACTCCTCGAA',
             [(0, 1), (1, 1), (2, 1), (0, 5), (2, 1), (0, 3)]
         )
-        fasta = self.sfc.single_segment_to_fasta(segment)
+        segment = AlignedSegment(mock_segment)
+        fasta = segment.to_fasta()
         desired_fasta = np.array(list('AC-TCCTC-GAA'), dtype='<U1')
         self.assertTrue(np.all(fasta==desired_fasta), 'with insertion')
 
-        fasta = self.sfc.single_segment_to_fasta(segment, False)
+        fasta = segment.to_fasta(False)
         desired_fasta = np.array(list('A-TCCTC-GAA'), dtype='<U1')
         self.assertTrue(np.all(fasta==desired_fasta), 'without insertion')
 
 
-class TestMultipleSAMFASTAConverter(unittest.TestCase):
+class TestSeveralMappedReads(unittest.TestCase):
 
     def setUp(self):
-        self.sam_fasta_converter = SAMFASTAConverter()
-        self.mock_segments = [
+        self.mock_alignment = MockPysamAlignment([
             MockPysamAlignedSegment(
                 'ATCTCACGATTGC', # read 1
                 [(0, 13)],
@@ -70,10 +62,11 @@ class TestMultipleSAMFASTAConverter(unittest.TestCase):
                 [(0, 9), (1, 1), (0, 5)],
                 4
             )
-        ]
+        ])
+        self.mapped_reads = MappedReads(self.mock_alignment)
 
     def test_initiate_conversion(self):
-        segments = [AlignedSegment(segment) for segment in self.mock_segments]
+        segments = self.mapped_reads.reads
         window_start = 2
         for i, segment in enumerate(segments):
             print('Initiating segment %d for conversion...' % i)
@@ -90,12 +83,11 @@ class TestMultipleSAMFASTAConverter(unittest.TestCase):
         self.assertEqual(segments[4].current_character, '~')
 
     def test_partial_single_case_with_insertions(self):
-        sam_fasta_converter = SAMFASTAConverter()
         reference_length = 20
         window_start = 2
         window_end = 16
-        sam_fasta_converter.initialize(
-            self.mock_segments, reference_length, window_start, window_end
+        self.mapped_reads.initiate_conversion(
+            reference_length, window_start, window_end
         )
 
         desired_fasta = [
@@ -108,18 +100,25 @@ class TestMultipleSAMFASTAConverter(unittest.TestCase):
         number_of_rows = len(desired_fasta)
         number_of_columns = len(desired_fasta[0])
         for j in range(number_of_columns):
-            insertion_result = sam_fasta_converter.handle_insertions()
+            insertion_result = self.mapped_reads.handle_insertions()
             if not insertion_result:
-                sam_fasta_converter.handle_deletions_and_matches()
-            column = sam_fasta_converter.fasta[:, j]
+                self.mapped_reads.handle_deletions_and_matches()
+            column = self.mapped_reads.fasta[:, j]
             desired_column = [row[j] for row in desired_fasta]
             triplets = zip(range(number_of_rows), column, desired_column)
             for i, character, desired_character in triplets:
                 error_message = 'row %d, column %d' % (i, j)
                 self.assertEqual(character, desired_character, error_message)
 
+
+class TestFullAlignment(unittest.TestCase):
+
+    @classmethod
+    def setUpClass(cls):
+        cls.sample_alignment = create_sample_alignment()
+        cls.mapped_reads = MappedReads(cls.sample_alignment)
+
     def test_full_single_case_with_insertions(self):
-        sample_alignment = create_sample_alignment()
         df = pd.read_excel(excel_filepath, header=None)
         desired_fasta = np.array(
             df.iloc[
@@ -133,21 +132,19 @@ class TestMultipleSAMFASTAConverter(unittest.TestCase):
             excel['read_window_start']: excel['read_window_end']
         ], dtype=np.int)
 
-        sfc = SAMFASTAConverter()
         reference_length = 20
         window_start = 2
         window_end = 16
-        fasta, reference_position = sfc.sam_window_to_fasta_with_insertions(
-            sample_alignment.fetch(), reference_length,
-            window_start, window_end
-        )
+        fasta, reference_position = self.mapped_reads. \
+            sam_window_to_fasta_with_insertions(
+                reference_length, window_start, window_end
+            )
         self.assertTrue(np.all(fasta == desired_fasta))
         self.assertTrue(np.all(
             reference_position == desired_reference_position
         ))
 
     def test_full_single_case_without_insertions(self):
-        sample_alignment = create_sample_alignment()
         df = pd.read_excel(excel_filepath, header=None)
         window_start = 2
         window_end = 16
@@ -178,10 +175,9 @@ class TestMultipleSAMFASTAConverter(unittest.TestCase):
         )
         desired_fasta = full_fasta[:, window_start: window_end]
 
-        sfc = SAMFASTAConverter()
         reference_length = 20
-        fasta = sfc.sam_window_to_fasta(
-            sample_alignment, window_start, window_end
+        fasta = self.mapped_reads.sam_window_to_fasta(
+            window_start, window_end
         )
         self.assertTrue(np.all(fasta == desired_fasta))
 
