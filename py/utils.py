@@ -80,8 +80,8 @@ paired-end (1 = true, 0 = false) : 0
 SNV_thres : 0.01
 reconstruction_start : 1
 reconstruction_stop: 1300
-min_mapping_qual : 60
-min_read_length : 150
+min_mapping_qual : 20
+min_read_length : 50
 max_insert_length : 250
 characteristic zone name : test
 seq_err (assumed sequencing error rate(%%)) : 0.1

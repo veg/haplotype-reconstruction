@@ -505,19 +505,25 @@ rule all_savage:
       reference=ALL_REFERENCES
     )
 
-rule abayesqr:
+rule abayesqr_config:
   input:
     sam="output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.sam",
     reference="input/references/{reference}.fasta"
   output:
-    config="output/{dataset}/{qc}/{read_mapper}/{reference}/abayesqr/config",
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/abayesqr/config",
+  run:
+    write_abayesqr_config(input.sam, input.reference, output[0])
+
+rule abayesqr:
+  input:
+    rules.abayesqr_config.output[0]
+  output:
     freq="output/{dataset}/{qc}/{read_mapper}/{reference}/abayesqr/test_Freq.txt",
     seq="output/{dataset}/{qc}/{read_mapper}/{reference}/abayesqr/test_Seq.txt",
     viralseq="output/{dataset}/{qc}/{read_mapper}/{reference}/abayesqr/test_ViralSeq.txt",
     fasta="output/{dataset}/{qc}/{read_mapper}/{reference}/abayesqr/haplotypes.fasta"
   run:
-    write_abayesqr_config(input.sam, input.reference, output.config)
-    shell("aBayesQR {output.config}")
+    shell("aBayesQR {input}")
     shell("mv test_Freq.txt {output.freq}")
     shell("mv test_Seq.txt {output.seq}")
     shell("mv test_ViralSeq.txt {output.viralseq}")
