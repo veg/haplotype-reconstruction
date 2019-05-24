@@ -7,7 +7,6 @@ import pandas as pd
 import numpy as np
 from Bio import SeqIO
 from joblib import Memory
-from tqdm import tqdm
 
 from py import ErrorCorrection
 from py import partial_covariation_test
@@ -51,7 +50,6 @@ def get_pairs_to_test(threshold):
     total_pairs = number_of_interesting_sites*(number_of_interesting_sites+1)/2
     pairs = []
     all_pairs = it.combinations(interesting_sites, 2)
-    pbar = tqdm(total=total_pairs)
     for i, pair in enumerate(all_pairs):
         site_i, site_j = pair
         content_i = numpy_fasta[:, site_i] != '-'
@@ -59,8 +57,6 @@ def get_pairs_to_test(threshold):
         valid = content_i & content_j
         if valid.sum() > threshold:
             pairs.append((site_i, site_j))
-        pbar.update()
-    pbar.close()
     pairs_df = pd.DataFrame({
         'site_i': pd.Series([pair[0] for pair in pairs], dtype='int'),
         'site_j': pd.Series([pair[1] for pair in pairs], dtype='int')

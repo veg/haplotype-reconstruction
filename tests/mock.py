@@ -3,6 +3,8 @@ import re
 
 import pandas as pd
 
+from py import BaseMappedReads
+from py import AlignedSegment
 
 excel_information = {
     'read_row_start': 3,
@@ -20,19 +22,25 @@ excel_information = {
 }
 
 class MockPysamAlignedSegment:
+
     def __init__(self, alignment_sequence, cigartuples,
             reference_start=None, reference_end=None):
         self.query_alignment_sequence = alignment_sequence
         self.cigartuples = cigartuples
         self.reference_start = reference_start
         self.reference_end = reference_end
+    
+    @property
+    def pysam_aligned_segment(self):
+        return self
 
 
-class MockPysamAlignment:
+class MockMappedReads(BaseMappedReads):
+
     def __init__(self, mock_segments):
         self.mock_segments = mock_segments
 
-    def fetch(self):
+    def fetch(self, start=0, stop=10000000):
         return self.mock_segments
 
 
@@ -70,12 +78,12 @@ def create_sample_alignment():
         cigar_string_to_tuples(cigar_string) for cigar_string in cigar_strings
     ]
     mock_segments = [
-        MockPysamAlignedSegment(
+        AlignedSegment(MockPysamAlignedSegment(
             query, cigar_tuple, reference_start, reference_end
-        )
+        ))
         for query, cigar_tuple, reference_start, reference_end
         in zip(queries, cigar_tuples, reference_starts, reference_ends)
     ]
-    alignment = MockPysamAlignment(mock_segments)
+    alignment = MockMappedReads(mock_segments)
     return alignment
 

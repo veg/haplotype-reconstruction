@@ -17,31 +17,24 @@ class AlignedSegment:
     def __str__(self):
         return 'AlignedSegment: PIQ=%d' % self.position_in_query
 
-    @property
-    def cigartuples(self):
-        return self.pysam_aligned_segment.cigartuples
+    def __getattr__(self, attr):
+        if hasattr(self.pysam_aligned_segment, attr):
+            return getattr(self.pysam_aligned_segment, attr)
+        elif hasattr(self):
+            return getattr(self, attr)
+        else:
+            msg = "'AlignedSegment' object has no attribute '%s'" % attr
+            raise AttributeError(msg)
 
     @property
     def current_cigar_tuple(self):
         return self.cigartuples[self.current_cigar_tuple_index]
 
     @property
-    def query_alignment_sequence(self):
-        return self.pysam_aligned_segment.query_alignment_sequence
-
-    @property
     def current_character(self):
         if not self.entered or self.exited:
             return self.outer_gap_char
         return self.query_alignment_sequence[self.position_in_query]
-
-    @property
-    def reference_start(self):
-        return self.pysam_aligned_segment.reference_start
-
-    @property
-    def reference_end(self):
-        return self.pysam_aligned_segment.reference_end
 
     def advance(self):
         if not self.exited:
@@ -130,19 +123,7 @@ class AlignedSegment:
         return full_seq_np[start:stop]
 
 
-class MappedReads:
-
-    def __init__(self, pysam_alignment):
-        if type(pysam_alignment) == str:
-            extension = pysam_alignment.split('.')[-1]
-            mode = 'rb' if extension == 'bam' else 'sam'
-            pysam_alignment = pysam.AlignmentFile(pysam_alignment, mode)
-        self.reads = [
-            AlignedSegment(segment) for segment in pysam_alignment.fetch()
-        ]
-
-    def fetch(self):
-        return self.reads
+class BaseMappedReads:
 
     def initiate_conversion(self, reference_length,
             window_start, window_end, outer_gap_char='~'):
@@ -151,7 +132,7 @@ class MappedReads:
         self.outer_gap_char = outer_gap_char
         self.window_start = window_start
         self.window_end = window_end
-        number_of_rows = len(self.reads)
+        number_of_rows = len(self.fetch())
         number_of_columns = 2*reference_length
         self.fasta = np.array(
             [number_of_columns*['.'] for _ in range(number_of_rows)],
@@ -160,7 +141,7 @@ class MappedReads:
         self.reference_positions = np.zeros(
             number_of_columns, dtype=np.int
         )
-        for segment in self.reads:
+        for segment in self.fetch():
             segment.initiate_conversion(window_start)
 
     def should_continue(self):
@@ -174,7 +155,7 @@ class MappedReads:
 
     def handle_insertions(self):
         insertions = []
-        for i, segment in enumerate(self.reads):
+        for i, segment in enumerate(self.fetch()):
             if segment.exited:
                 continue
             action = segment.current_cigar_tuple[0]
@@ -182,7 +163,7 @@ class MappedReads:
                 insertions.append(i)
         insertions_present = len(insertions) > 0
         if insertions_present:
-            for i, segment in enumerate(self.reads):
+            for i, segment in enumerate(self.fetch()):
                 if not segment.entered or segment.exited:
                     character = self.outer_gap_char
                 else:
@@ -198,7 +179,7 @@ class MappedReads:
         return False
 
     def handle_deletions_and_matches(self):
-        for i, segment in enumerate(self.reads):
+        for i, segment in enumerate(self.fetch()):
             character = segment.handle_deletion_and_match(
                 self.position_in_reference
             )
@@ -209,7 +190,7 @@ class MappedReads:
 
     def sam_window_to_fasta_with_insertions(self, reference_length,
             window_start, window_end, outer_gap_char='~'):
-        number_of_segments = len(self.reads)
+        number_of_segments = len(self.fetch())
         self.initiate_conversion(reference_length,
             window_start, window_end, outer_gap_char)
         while self.should_continue():
@@ -245,16 +226,21 @@ class MappedReads:
 
     def sam_window_to_fasta(self, window_start,
             window_end, outer_gap_char='~'):
-        segments = filter(
-            self.segment_in_window(window_start, window_end), 
-            self.reads
-        )
         segments_np = np.array([
             self.pad_and_trim_segment(
                 segment, window_start,
                 window_end, outer_gap_char
             )
-            for segment in segments
+            for segment in self.fetch(start=window_start, stop=window_end)
         ])
         return segments_np
         
+
+class MappedReads(BaseMappedReads, pysam.AlignmentFile):
+
+    def fetch(self, start=0, stop=10000000):
+        ref = self.header['SQ'][0]['SN']
+        for aligned_segment in super().fetch(ref, start, stop):
+            yield AlignedSegment(aligned_segment)
+
+

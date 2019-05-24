@@ -10,7 +10,7 @@ from Bio.Seq import Seq
 from py import MappedReads
 from py import AlignedSegment
 from .mock import MockPysamAlignedSegment
-from .mock import MockPysamAlignment
+from .mock import MockMappedReads
 from .mock import excel_information as excel
 from .mock import create_sample_alignment
 from .mock import excel_filepath
@@ -36,7 +36,7 @@ class TestAlignedSegment(unittest.TestCase):
 class TestSeveralMappedReads(unittest.TestCase):
 
     def setUp(self):
-        self.mock_alignment = MockPysamAlignment([
+        mock_reads = [
             MockPysamAlignedSegment(
                 'ATCTCACGATTGC', # read 1
                 [(0, 13)],
@@ -62,11 +62,13 @@ class TestSeveralMappedReads(unittest.TestCase):
                 [(0, 9), (1, 1), (0, 5)],
                 4
             )
-        ])
-        self.mapped_reads = MappedReads(self.mock_alignment)
+        ]
+        self.mapped_reads = MockMappedReads([
+            AlignedSegment(segment) for segment in mock_reads]
+        )
 
     def test_initiate_conversion(self):
-        segments = self.mapped_reads.reads
+        segments = self.mapped_reads.fetch()
         window_start = 2
         for i, segment in enumerate(segments):
             print('Initiating segment %d for conversion...' % i)
@@ -115,8 +117,7 @@ class TestFullAlignment(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.sample_alignment = create_sample_alignment()
-        cls.mapped_reads = MappedReads(cls.sample_alignment)
+        cls.mapped_reads = create_sample_alignment()
 
     def test_full_single_case_with_insertions(self):
         df = pd.read_excel(excel_filepath, header=None)
@@ -180,4 +181,18 @@ class TestFullAlignment(unittest.TestCase):
             window_start, window_end
         )
         self.assertTrue(np.all(fasta == desired_fasta))
+
+
+class TestRealData(unittest.TestCase):
+
+    bam_path = os.path.join(os.getcwd(), 'tests', 'data', 'sorted.bam')
+
+    def test_basic_functionality(self):
+        mapped_reads = MappedReads(self.bam_path)
+        a_read = next(mapped_reads.fetch())
+        self.assertTrue(a_read.reference_start >= 0)
+        self.assertTrue(len(a_read.to_fasta()) > 0)
+        fasta_window = mapped_reads.sam_window_to_fasta(0, 100)
+        self.assertTrue(fasta_window.shape[0] >= 1)
+        self.assertTrue(fasta_window.shape[1] >= 1)
 

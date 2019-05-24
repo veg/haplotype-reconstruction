@@ -7,6 +7,7 @@ from Bio import SeqIO
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
 
+from .mapped_reads import MappedReads
 from .error_correction import ErrorCorrection
 from .read_graph import SuperReadGraph
 from .regression import perform_regression
@@ -31,7 +32,7 @@ def superreads_io(input_consensus, input_json, input_bam,
         covarying_sites = np.array(json.load(json_file), dtype=np.int)
     consensus = SeqIO.read(input_consensus, 'fasta')
     consensus_np = np.array(list(str(consensus.seq)))
-    corrected_reads = pysam.AlignmentFile(input_bam, 'rb')
+    corrected_reads = MappedReads(input_bam, 'rb')
 
     superread_graph = SuperReadGraph(corrected_reads, covarying_sites)
     superread_info = superread_graph.obtain_superreads()

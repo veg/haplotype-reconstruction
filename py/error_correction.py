@@ -26,10 +26,9 @@ def partial_covariation_test(arguments):
         3
     )
     print('   ...processing block %d...' % i)
-    pysam_alignment = pysam.AlignmentFile(pysam_path, 'rb')
     pair_min = min([min(pair[0], pair[1]) for pair in pairs_for_min])
     pair_max = max([max(pair[0], pair[1]) for pair in pairs_for_max])
-    mr = MappedReads(pysam_alignment)
+    mr = MappedReads(pysam_path)
     fasta_window = mr.sam_window_to_fasta(pair_min, pair_max+1)
     results = []
     for col_i, col_j in pairs:
@@ -64,7 +63,7 @@ def partial_covariation_test(arguments):
             ]
             _, p_value = fisher_exact(table)
             results.append((col_i, col_j, i_char, j_char, p_value))
-    pysam_alignment.close()
+    mr.close()
     print('   ...done block %d!' % i)
     return pd.DataFrame(
         results, columns=('col_i', 'col_j', 'i_char', 'j_char', 'p_value')
