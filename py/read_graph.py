@@ -7,7 +7,6 @@ from Bio import SeqIO
 from scipy.stats import rankdata
 
 from .mapped_reads import MappedReads
-from .utils import read_reference_start_and_end
 
 
 class SuperReadGraph:
@@ -22,8 +21,8 @@ class SuperReadGraph:
             self.superread_graph = None
 
     def obtain_superreads(self, minimum_weight=3):
-        read_information = read_reference_start_and_end(
-            self.mapped_reads, self.covarying_sites
+        read_information = self.mapped_reads.read_reference_start_and_end(
+            self.covarying_sites
         )
         read_groups = {}
         for i, read in enumerate(self.mapped_reads.fetch()):

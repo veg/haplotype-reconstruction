@@ -11,7 +11,6 @@ from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
 
 from .mapped_reads import MappedReads
-from .utils import read_reference_start_and_end
 
 
 def grouper(iterable, n, fillvalue=None):
@@ -224,25 +223,35 @@ class ErrorCorrection:
         self.covarying_errors = covarying_errors
         return covarying_errors
 
-    def get_covarying_correction(read):
-        pass
+    def get_covarying_correction(self, read, discrepancies):
+        for discrepancy in discrepancies:
+            pass
+            
 
     def get_all_covarying_corrections(self):
         covarying_errors = self.get_covarying_errors()
-        self.read_information = read_reference_start_and_end(
-            self.pysam_alignment, self.covarying_sites
+        self.read_information = self.mapped_reads.read_reference_start_and_end(
+            self.covarying_sites
         )
         corrections = {}
-        for read in self.pysam_alignment.fetch():
+        for i, read in enumerate(self.mapped_reads.reads):
             ce_start = (covarying_errors['site'] >= read.reference_start).idxmax()
             ce_end = (covarying_errors['site'] >= read.reference_end).idxmax()-1
-            sequence, position = self.read_count_data(read)
+            sequence = read.to_fasta()
             unshifted_indices = covarying_errors.loc[ce_start:ce_end, 'site']
             shifted_indices = unshifted_indices - read.reference_start
+            discrepancies = []
+            for shifted_index in shifted_indices:
+                #if sequence[shifted_index] = 
+                pass
             cv_sequence = sequence[shifted_indices]
             cv_errors = covarying_errors.loc[ce_start:ce_end, 'variable']
             if (cv_sequence == cv_errors).any():
-                corrections[read.query_name] = self.get_covarying_correction(read)
+                read_length = len(cv_sequence)
+                discrepancies = np.arange(read_length)[cv_sequence != cv_errors]
+                corrections[read.query_name] = self.get_covarying_correction(
+                    read, i, discrepancies
+                )
 
     def corrected_reads(self, **kwargs):
         nucleotide_counts = self.get_nucleotide_counts()

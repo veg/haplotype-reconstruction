@@ -1,5 +1,6 @@
 import pysam
 import numpy as np
+import pandas as pd
 
 
 class AlignedSegment:
@@ -234,7 +235,23 @@ class BaseMappedReads:
             for segment in self.fetch(start=window_start, stop=window_end)
         ])
         return segments_np
-        
+
+    def read_reference_start_and_end(self, site_boundaries):
+        read_information = pd.DataFrame(
+            [
+                (read.reference_start, read.reference_end)
+                for read in self.fetch()
+            ],
+            columns=['reference_start', 'reference_end']
+        )
+        read_information['covarying_start'] = np.searchsorted(
+            site_boundaries, read_information['reference_start']
+        )
+        read_information['covarying_end'] = np.searchsorted(
+            site_boundaries, read_information['reference_end']
+        )
+        return read_information
+
 
 class MappedReads(BaseMappedReads, pysam.AlignmentFile):
 
@@ -242,5 +259,4 @@ class MappedReads(BaseMappedReads, pysam.AlignmentFile):
         ref = self.header['SQ'][0]['SN']
         for aligned_segment in super().fetch(ref, start, stop):
             yield AlignedSegment(aligned_segment)
-
 
