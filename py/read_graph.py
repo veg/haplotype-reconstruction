@@ -26,7 +26,7 @@ class SuperReadGraph:
             self.mapped_reads, self.covarying_sites
         )
         read_groups = {}
-        for i, read in enumerate(self.mapped_reads.reads):
+        for i, read in enumerate(self.mapped_reads.fetch()):
             row = read_information.iloc[i, :]
             key = (row['covarying_start'], row['covarying_end'])
             if key in read_groups:
