@@ -111,15 +111,20 @@ def candidates_io(input_consensus, input_graph_json, input_cvs_json,
         json.dump(describing_superreads, json_file, indent=2)
 
 
-def regression_io(input_superreads, input_candidates, output_fasta):
+def regression_io(input_superreads, input_candidates_json,
+        input_candidates_fasta, output_fasta):
     with open(input_superreads) as superread_file:
         superreads = json.load(superread_file)['nodeLinkData']['nodes']
 
-    with open(input_candidates) as candidates_file:
+    with open(input_candidates_json) as candidates_file:
         candidates = json.load(candidates_file)
 
-    perform_regression(superreads, candidates)
+    actual_haplotype_indices = perform_regression(superreads, candidates)
+    candidates = list(SeqIO.parse(input_candidates_fasta, 'fasta'))
+    actual_haplotypes = []
+    for candidate_index, record in enumerate(candidates):
+        if candidate_index in actual_haplotype_indices:
+            actual_haplotypes.append(record)
 
-    with open(output_fasta, 'w') as fasta_file:
-        fasta_file.write('to do')
+    SeqIO.write(actual_haplotypes, output_fasta, 'fasta')
 
