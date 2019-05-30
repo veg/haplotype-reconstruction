@@ -79,7 +79,10 @@ def perform_regression(superread_info, candidate_info, maxit=100000,
             params = (relative_error, i)
             print('Reached relative error of %.5e at iteration %d!' % params)
             break
+    actual_haplotypes = []
     for i, frequency in enumerate(x):
         if frequency > 0:
+            actual_haplotypes.append(i)
             print('Candidate %2d: frequency %.3f' % (i, frequency))
+    return actual_haplotypes
 

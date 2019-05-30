@@ -650,11 +650,12 @@ rule truth_and_candidates_diagnostics:
 rule regression:
   input:
     superreads=rules.superread.output.json,
-    candidates=rules.candidate_haplotypes.output.json
+    candidates_json=rules.candidate_haplotypes.output.json,
+    candidates_fasta=rules.candidate_haplotypes.output.fasta
   output:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/haplotypes.fasta",
   run:
-    regression_io(input.superreads, input.candidates, output[0])
+    regression_io(input.superreads, input.candidates_json, input.candidates_fasta, output[0])
 
 # Results
 
