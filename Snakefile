@@ -3,11 +3,10 @@ import json
 
 import pysam
 
-from py import error_correction_io
-from py import superreads_io
-from py import candidates_io
-from py import regression_io
-from py import ErrorCorrection
+from convex_qsr import error_correction_io
+from convex_qsr import read_graph_io
+from convex_qsr import regression_io
+from convex_qsr import ErrorCorrection
 
 from py import extract_lanl_genome
 from py import simulate_amplicon_dataset 
@@ -603,26 +602,17 @@ rule superread:
     bam=rules.error_correction.output.bam,
     json=rules.error_correction.output.json,
     consensus=rules.error_correction.output.consensus,
-    reference=rules.situate_references.output[0]
   output:
-    no_ref="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/superreads.fasta",
+    full="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/superreads-full.fasta",
     cvs="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/superreads-cvs.fasta",
-    ref="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/superreads_reference.fasta",
-    json="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/superreads.json"
+    describing="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/describing.json",
+    graph="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/graph.json",
+    candidates="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/candidates.fasta"
   run:
-    superreads_io(input.consensus, input.json, input.bam, output.no_ref, output.cvs, output.json)
-    shell("cat {input.reference} {output.no_ref} > {output.ref}")
-
-rule candidate_haplotypes:
-  input:
-    consensus=rules.error_correction.output.consensus,
-    graph=rules.superread.output.json,
-    cvs=rules.error_correction.output.json
-  output:
-    fasta="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/candidates.fasta",
-    json="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/candidates.json"
-  run:
-    candidates_io(input.consensus, input.graph, input.cvs, output.fasta, output.json)
+    read_graph_io(
+      input.bam, input.json, input.consensus,
+      output.full, output.cvs, output.describing, output.graph, output.candidates
+    )
 
 def reference_input(wildcards):
   format_string = "output/%s/%s_truth.fasta"
@@ -631,7 +621,7 @@ def reference_input(wildcards):
 
 rule truth_and_candidates:
   input:
-    candidates=rules.candidate_haplotypes.output[0],
+    candidates=rules.superread.output.candidates,
     truth=reference_input
   output:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/truth_and_candidates.fasta"
@@ -640,7 +630,7 @@ rule truth_and_candidates:
 
 rule truth_and_candidates_diagnostics:
   input:
-    candidates=rules.candidate_haplotypes.output[0],
+    candidates=rules.superread.output.candidates,
     truth=reference_input
   output:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/truth_and_candidates.json"
@@ -649,13 +639,13 @@ rule truth_and_candidates_diagnostics:
 
 rule regression:
   input:
-    superreads=rules.superread.output.json,
-    candidates_json=rules.candidate_haplotypes.output.json,
-    candidates_fasta=rules.candidate_haplotypes.output.fasta
+    superreads=rules.superread.output.graph,
+    describing=rules.superread.output.describing,
+    candidates_fasta=rules.superread.output.candidates
   output:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/haplotypes.fasta",
   run:
-    regression_io(input.superreads, input.candidates_json, input.candidates_fasta, output[0])
+    regression_io(input.superreads, input.describing, input.candidates_fasta, output[0])
 
 # Results
 

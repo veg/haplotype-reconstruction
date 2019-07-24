@@ -4,8 +4,6 @@ from itertools import tee
 import numpy as np
 from Bio import SeqIO
 
-from .mapped_reads import MappedReads
-
 
 def extract_lanl_genome(lanl_input, lanl_id, fasta_output):
   records = SeqIO.to_dict(SeqIO.parse(lanl_input, 'fasta'))
