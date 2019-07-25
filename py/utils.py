@@ -1,3 +1,6 @@
+import subprocess
+import os
+
 import numpy as np
 import pandas as pd
 from Bio import SeqIO
@@ -134,3 +137,24 @@ def add_subtype_information(input_csv, output_csv):
     df['Subtype2'] = df['ID2'].apply(lambda row: row.split('.')[0])
     df.to_csv(output_csv, index=False)
 
+
+def extract_5vm_truth(input_fasta, reference_path, output_path):
+    sequences = list(SeqIO.parse(input_fasta, "fasta"))
+    aligned_sequences = []
+    for sequence in sequences:
+        sequence_id = sequence.id.replace('.', '_')
+        output_dir = os.path.join("output", "FiveVirusMixIllumina_1")
+        sequence_filename = "%s.fasta" % sequence_id
+        sequence_path = os.path.join(output_dir, sequence_filename)
+        alignment_path = os.path.join(output_dir, sequence_id + ".fasta")
+        SeqIO.write(sequence, alignment_path, "fasta")
+        command = [
+            "water", "-asequence", sequence_path, "-bsequence",
+            reference_path, "-gapopen", "10.0", "-gapextend", ".5", "-aformat",
+            "fasta", "-outfile", alignment_path
+        ]
+        subprocess.run(command)
+        aligned_sequence = list(SeqIO.parse(alignment_path, "fasta"))[0]
+        aligned_sequence.seq = aligned_sequence.seq.ungap('-')
+        aligned_sequences.append(aligned_sequence)
+    SeqIO.write(aligned_sequences, output_path, "fasta")
