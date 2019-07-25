@@ -12,6 +12,7 @@ from py import extract_lanl_genome
 from py import simulate_amplicon_dataset 
 from py import simulate_wgs_dataset 
 from py import covarying_sites
+from py import extract_5vm_truth
 
 from py import evaluate
 from py import write_abayesqr_config
@@ -68,6 +69,14 @@ rule all_bams:
       dataset=ALL_DATASETS,
       reference=REFERENCE_SUBSET,
       haplotyper=HAPLOTYPERS
+    )
+
+rule all_acme_ec:
+  input:
+    expand(
+      "output/{dataset}/fastp/bowtie2/{reference}/acme/corrected.bam",
+      dataset=ALL_DATASETS,
+      reference=REFERENCE_SUBSET
     )
 
 ##################
@@ -180,6 +189,15 @@ rule wgs_simulation_true_sequences:
       bealign -r {input.reference} {input.wgs} {output.sam}
       bam2msa {output.sam} {output.fasta}
     """
+
+rule FVM_true_sequences:
+  input:
+    wgs="input/5VM.fasta",
+    reference="input/references/{reference}.fasta"
+  output:
+    fasta="output/FiveVirusMixIllumina_1/{reference}_truth.fasta"
+  run:
+    extract_5vm_truth(input.wgs, input.reference, output.fasta)
 
 rule wgs_simulation_true_covarying_sites:
   input:
