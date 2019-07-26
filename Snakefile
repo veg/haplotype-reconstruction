@@ -199,6 +199,14 @@ rule FVM_true_sequences:
   run:
     extract_5vm_truth(input.wgs, input.reference, output.fasta)
 
+rule FVM_true_covarying:
+  input:
+    "output/FiveVirusMixIllumina_1/{reference}_truth.fasta"
+  output:
+    "output/FiveVirusMixIllumina_1/{reference}_truth.json"
+  run:
+    covarying_sites(input[0], output[0])
+
 rule wgs_simulation_true_covarying_sites:
   input:
     rules.wgs_simulation_true_sequences.output.fasta
@@ -592,7 +600,11 @@ rule error_correction:
     json="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/covarying_sites.json",
     consensus="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/consensus.fasta"
   run:
-    error_correction_io(input[0], output.bam, output.json, output.consensus)
+    error_correction_io(
+      input[0],
+      output.bam, output.json, output.consensus,
+      end_correction=10
+    )
     shell("samtools index {output.bam}")
 
 rule error_correction_fasta:
@@ -605,7 +617,7 @@ rule error_correction_fasta:
 
 rule all_fe_tests:
   input:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/sorted.bam"
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.bam"
   output:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/all_fe_tests.csv"
   run:
@@ -636,6 +648,15 @@ def reference_input(wildcards):
   format_string = "output/%s/%s_truth.fasta"
   parameters = (wildcards.dataset, wildcards.reference)
   return format_string % parameters
+
+rule truth_and_superreads:
+  input:
+    truth=reference_input,
+    superreads=rules.superread.output.full
+  output:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/truth_and_superreads.fasta"
+  shell:
+    "cat {input.truth} {input.superreads} > {output}"
 
 rule truth_and_candidates:
   input:

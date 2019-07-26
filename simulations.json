@@ -80,5 +80,27 @@
       "lanl_id": "B.US.2012.505_0122a.WG08.MG196700",
       "frequency": 0.5
     }
+  ],
+  "diverged_five": [
+    {
+      "lanl_id": "B.CH.2002.HIV_CH_BID-V3527_2002.JQ403021",
+      "frequency": 0.2
+    },
+    {
+      "lanl_id": "B.US.2008.HIV_US_BID-V4123_2008.JQ403034",
+      "frequency": 0.2
+    },
+    {
+      "lanl_id": "B.US.2003.PRLS01.FJ469753",
+      "frequency": 0.2
+    },
+    {
+      "lanl_id": "B.US.2010.505_0686a.WG04.MG196778",
+      "frequency": 0.2
+    },
+    {
+      "lanl_id": "B.US.2011.505_0896a.WG14.MG196849",
+      "frequency": 0.2
+    }
   ]
 }
