@@ -615,16 +615,16 @@ rule error_correction_fasta:
   shell:
     "bam2msa {input} {output}"
 
-rule all_fe_tests:
+rule all_cv_tests:
   input:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.bam"
   output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/all_fe_tests.csv"
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/all_cv_tests.csv"
   run:
     alignment=pysam.AlignmentFile(input[0])
     error_correction=ErrorCorrection(alignment)
     error_correction.full_covariation_test()
-    error_correction.all_fe_tests.to_csv(output[0])
+    error_correction.all_cv_tests.to_csv(output[0])
     alignment.close()
 
 rule superread:
