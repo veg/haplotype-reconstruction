@@ -33,7 +33,11 @@ RECONSTRUCTION_DATASETS = [
   "sergei1",
   "FiveVirusMixIllumina_1"
 ]
+SRA = [
+  "SRX3661402"
+]
 ALL_DATASETS = ACCESSION_NUMBERS + SIMULATED_DATASETS + RECONSTRUCTION_DATASETS
+KNOWN_TRUTH = SIMULATED_DATASETS + ["FiveVirusMixIllumina_1"]
 ALL_REFERENCES = ["env", "rev", "vif", "pol", "prrt", "rt", "pr", "gag", "int", "tat"] # + ["nef", "vpr"] 
 REFERENCE_SUBSET = ["env", "pol", "gag"]
 HYPHY_PATH = "/Users/stephenshank/Software/lib/hyphy"
@@ -77,6 +81,15 @@ rule all_acme_ec:
       "output/{dataset}/fastp/bowtie2/{reference}/acme/corrected.bam",
       dataset=ALL_DATASETS,
       reference=REFERENCE_SUBSET
+    )
+
+rule all_known_comparisons:
+  input:
+    expand(
+      "output/{dataset}/fastp/bowtie2/{reference}/{haplotyper}/truth_and_haplotypes.png",
+      dataset=KNOWN_TRUTH,
+      reference=REFERENCE_SUBSET,
+      haplotyper=HAPLOTYPERS
     )
 
 ##################
@@ -256,11 +269,20 @@ rule genome_distances_with_subtypes:
 
 # Situating other data
 
+rule sra_dataset:
+  output:
+    "output/sra/{sra_accession}.fastq"
+  params:
+    "output/sra"
+  shell:
+    "fastq-dump --outdir {params[0]} {wildcards.sra_accession}"
+
 def situate_input(wildcards):
   dataset = wildcards.dataset
   is_evolution_dataset = dataset[:7] == 'ERS6610'
   is_amplicon_dataset = 'amplicon' in dataset
   is_simulated_dataset = 'simulation' in dataset
+  is_sra_dataset = dataset[:2] == 'SR'
 
   if is_evolution_dataset:
     return "input/evolution/%s.fastq" % dataset
@@ -268,6 +290,8 @@ def situate_input(wildcards):
     return "output/%s/amplicon.fastq" % dataset
   if is_simulated_dataset:
     return "output/%s/wgs.fastq" % dataset
+  if is_sra_dataset:
+    return "output/sra/%s.fastq" % dataset
   return "input/reconstruction/%s.fastq" % dataset
 
 rule situate_data:
@@ -329,7 +353,7 @@ rule fastp:
     html="output/{dataset}/fastp/qc.html"
   shell:
     """
-      fastp -A -q 15 -i {input} -o {output.fastq} -j {output.json} -h {output.html}
+      fastp -A -q 15 -i {input} -o {output.fastq} -j {output.json} -h {output.html} -n 50
       cat {output.fastq} | paste - - - - | sed 's/^@/>/g'| cut -f1-2 | tr '\t' '\n' > {output.fasta}
     """
 
