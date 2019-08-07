@@ -622,14 +622,14 @@ rule error_correction:
     bam="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/corrected.bam",
     index="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/corrected.bam.bai",
     json="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/covarying_sites.json",
-    consensus="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/consensus.fasta"
+    consensus="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/consensus.fasta",
+    tests="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/all_cv_tests.csv"
   run:
     error_correction_io(
       input[0],
-      output.bam, output.json, output.consensus,
+      output.bam, output.json, output.consensus, output.tests,
       end_correction=10
     )
-    shell("samtools index {output.bam}")
 
 rule error_correction_fasta:
   input:
@@ -638,18 +638,6 @@ rule error_correction_fasta:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/corrected.fasta"
   shell:
     "bam2msa {input} {output}"
-
-rule all_cv_tests:
-  input:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.bam"
-  output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/all_cv_tests.csv"
-  run:
-    alignment=pysam.AlignmentFile(input[0])
-    error_correction=ErrorCorrection(alignment)
-    error_correction.full_covariation_test()
-    error_correction.all_cv_tests.to_csv(output[0])
-    alignment.close()
 
 rule superread:
   input:
