@@ -453,6 +453,14 @@ rule all_acme_bams:
       reference=ALL_REFERENCES
     )
 
+rule insertion_plot:
+  input:
+    rules.sort_and_index.output.bam
+  output:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/insertion_plot.png"
+  script:
+    "R/insertion_plot.R"
+
 rule all_bowtie_bams:
   input:
     expand(
