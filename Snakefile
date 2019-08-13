@@ -623,21 +623,24 @@ rule readreduce:
 
 # ACME haplotype reconstruction
 
-rule error_correction:
+rule acme_haplotypes:
   input:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.bam"
   output:
-    bam="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/corrected.bam",
-    index="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/corrected.bam.bai",
-    json="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/covarying_sites.json",
-    consensus="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/consensus.fasta",
-    tests="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/all_cv_tests.csv"
-  run:
-    error_correction_io(
-      input[0],
-      output.bam, output.json, output.consensus, output.tests,
-      end_correction=10
-    )
+    corrected="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/corrected.bam",
+    full="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/superreads-full.fasta",
+    haplotypes="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/haplotypes.fasta",
+    candidates="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/candidates.fasta"
+  params:
+    quasispecies="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/quasispecies.fasta",
+    output_dir="output/{dataset}/{qc}/{read_mapper}/{reference}/acme"
+  shell:
+    """
+      touch {output.full}
+      touch {output.candidates}
+      cqsr -b {input} -o {params.output_dir}
+      cp {params.quasispecies} {output.haplotypes}
+    """
 
 rule error_correction_fasta:
   input:
@@ -647,23 +650,6 @@ rule error_correction_fasta:
   shell:
     "bam2msa {input} {output}"
 
-rule superread:
-  input:
-    bam=rules.error_correction.output.bam,
-    json=rules.error_correction.output.json,
-    consensus=rules.error_correction.output.consensus,
-  output:
-    full="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/superreads-full.fasta",
-    cvs="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/superreads-cvs.fasta",
-    describing="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/describing.json",
-    graph="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/graph.json",
-    candidates="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/candidates.fasta"
-  run:
-    read_graph_io(
-      input.bam, input.json, input.consensus,
-      output.full, output.cvs, output.describing, output.graph, output.candidates
-    )
-
 def reference_input(wildcards):
   format_string = "output/%s/%s_truth.fasta"
   parameters = (wildcards.dataset, wildcards.reference)
@@ -672,7 +658,7 @@ def reference_input(wildcards):
 rule truth_and_superreads:
   input:
     truth=reference_input,
-    superreads=rules.superread.output.full
+    superreads=rules.acme_haplotypes.output.full
   output:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/truth_and_superreads.fasta"
   shell:
@@ -680,7 +666,7 @@ rule truth_and_superreads:
 
 rule truth_and_candidates:
   input:
-    candidates=rules.superread.output.candidates,
+    candidates=rules.acme_haplotypes.output.candidates,
     truth=reference_input
   output:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/truth_and_candidates.fasta"
@@ -689,22 +675,12 @@ rule truth_and_candidates:
 
 rule truth_and_candidates_diagnostics:
   input:
-    candidates=rules.superread.output.candidates,
+    candidates=rules.acme_haplotypes.output.candidates,
     truth=reference_input
   output:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/truth_and_candidates.json"
   run:
     evaluate(input.candidates, input.truth, output[0])
-
-rule regression:
-  input:
-    superreads=rules.superread.output.graph,
-    describing=rules.superread.output.describing,
-    candidates_fasta=rules.superread.output.candidates
-  output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/haplotypes.fasta",
-  run:
-    regression_io(input.superreads, input.describing, input.candidates_fasta, output[0])
 
 # Results
 
