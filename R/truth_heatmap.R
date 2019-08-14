@@ -3,7 +3,7 @@ library(tidyverse)
 
 df <- read_csv(snakemake@input[[1]]);
 dd_min <- 0
-dd_max <- max(max(df$distance[df$distance < 50]), 5)
+dd_max <- max(df$distance[df$distance < 50])
 dd_mid = (dd_min + dd_max) / 2
 ggplot(df) + geom_tile(aes(first_record, second_record, fill=distance)) +
   theme(
