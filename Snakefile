@@ -19,6 +19,7 @@ from py import write_abayesqr_config
 from py import parse_abayesqr_output
 from py import pairwise_distance_csv
 from py import add_subtype_information
+from py import covarying_truth
 
 
 with open('simulations.json') as simulation_file:
@@ -42,6 +43,10 @@ ALL_REFERENCES = ["env", "rev", "vif", "pol", "prrt", "rt", "pr", "gag", "int", 
 REFERENCE_SUBSET = ["env", "pol", "gag"]
 HYPHY_PATH = "/Users/stephenshank/Software/lib/hyphy"
 HAPLOTYPERS = ["abayesqr", "savage", "regress_haplo", "quasirecomb"]
+
+wildcard_constraints:
+  dataset="[^/]+",
+  simulated_dataset="[^/]+"
 
 rule all_haplotypers:
   input:
@@ -638,6 +643,16 @@ rule error_correction:
       output.bam, output.json, output.consensus, output.tests,
       end_correction=10
     )
+
+rule covarying_truth:
+  input:
+    computed=rules.error_correction.output.json,
+    actual="output/{dataset}/{reference}_truth.json",
+    reference=rules.situate_references.output[0]
+  output:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/covarying_truth.json"
+  run:
+    covarying_truth(input.computed, input.actual, input.reference, output[0])
 
 rule error_correction_fasta:
   input:

@@ -1,4 +1,5 @@
 import subprocess
+import json
 import os
 
 import numpy as np
@@ -158,3 +159,38 @@ def extract_5vm_truth(input_fasta, reference_path, output_path):
         aligned_sequence.seq = aligned_sequence.seq.ungap('-')
         aligned_sequences.append(aligned_sequence)
     SeqIO.write(aligned_sequences, output_path, "fasta")
+
+def covarying_truth(input_computed, input_actual, input_reference, output_json):
+    reference = SeqIO.read(input_reference, 'fasta')
+    rl = len(reference.seq)
+    with open(input_computed) as input_file:
+        cvs = json.load(input_file)
+    with open(input_actual) as input_file:
+        true_cvs = json.load(input_file)
+
+    tp = []
+    fp = []
+    tn = []
+    fn = []
+
+    for i in range(rl):
+        if i in true_cvs and i in cvs:
+            tp.append(i)
+        elif i in true_cvs and not i in cvs:
+            fn.append(i)
+        elif not i in true_cvs and i in cvs:
+            fp.append(i)
+        elif not i in true_cvs and not i in cvs:
+            tn.append(i)
+    precision = len(tp)/(len(tp)+len(fp))
+    recall = len(tp)/(len(tp)+len(fn))
+    result = {
+        'true_positives': tp,
+        'true_negative': tn,
+        'false_positives': fp,
+        'false_negatives': fn,
+        'precision': precision,
+        'recall': recall
+    }
+    with open(output_json, 'w') as output_file:
+        json.dump(result, output_file, indent=2)
