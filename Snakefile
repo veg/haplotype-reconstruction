@@ -769,6 +769,17 @@ rule dashboard:
   shell:
     "npx webpack --output-path {params.path}"
 
+rule downsampling_accuracy:
+  input:
+    expand(
+      "output/{{dataset}}/{{qc}}/{{read_mapper}}/{{reference}}/acme/ds_{downsample}/covarying_truth.json",
+      downsample=[0, 20, 40, 60, 80]
+    )
+  output:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/downsampling.png"
+  script:
+    "R/downsampling_plot.R"
+
 # Regress Haplo
 
 rule regress_haplo_bam_to_variant_calls:
