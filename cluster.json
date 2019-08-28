@@ -1,0 +1,11 @@
+{
+  "__default__": {
+    "cluster" : "qsub",
+    "jobs": 250,
+    "nodes": 1,
+    "ppn": 1
+  },
+  "error_correction": {
+    "ppn": 24
+  }
+}
