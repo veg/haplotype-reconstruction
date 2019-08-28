@@ -4,6 +4,7 @@ import os
 
 import numpy as np
 import pandas as pd
+import pysam
 from Bio import SeqIO
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
@@ -160,6 +161,7 @@ def extract_5vm_truth(input_fasta, reference_path, output_path):
         aligned_sequences.append(aligned_sequence)
     SeqIO.write(aligned_sequences, output_path, "fasta")
 
+
 def covarying_truth(input_computed, input_actual, input_reference, output_json):
     reference = SeqIO.read(input_reference, 'fasta')
     rl = len(reference.seq)
@@ -194,3 +196,28 @@ def covarying_truth(input_computed, input_actual, input_reference, output_json):
     }
     with open(output_json, 'w') as output_file:
         json.dump(result, output_file, indent=2)
+
+
+def downsample_bam(input_bam_path, output_bam_path, downsample_amount):
+    downsample_percentage = 1 - int(downsample_amount) / 100
+    input_bam = pysam.AlignmentFile(input_bam_path, 'rb')
+    number_of_reads = input_bam.count()
+    downsample_number = np.ceil(downsample_percentage * number_of_reads).astype(np.int)
+    np.random.seed(1)
+    downsample_indices = np.random.choice(
+        number_of_reads, downsample_number, replace=False
+    )
+    downsample_indices.sort()
+    downsample_index = 0
+    output_bam = pysam.AlignmentFile(
+        output_bam_path, 'wb', header=input_bam.header
+    )
+    for i, read in enumerate(input_bam.fetch()):
+        if i == downsample_indices[downsample_index]:
+            output_bam.write(read)
+            downsample_index += 1
+        if downsample_index == len(downsample_indices):
+            break
+    output_bam.close()
+    pysam.index(output_bam_path)
+    input_bam.close()
