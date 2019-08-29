@@ -119,6 +119,8 @@ rule extract_gene:
   output:
     sam="output/lanl/{lanl_id}/{gene}/sequence.sam",
     fasta="output/lanl/{lanl_id}/{gene}/sequence.fasta"
+  conda:
+    "envs/veg.yml"
   shell:
     """
       bealign -r {input.reference} {input.genome} {output.sam}
@@ -145,6 +147,8 @@ rule amplicon_simulation:
     "output/lanl/{lanl_id}/{gene}/reads.fastq"
   params:
     out="output/lanl/{lanl_id}/{gene}/reads"
+  conda:
+    "envs/ngs.yml"
   shell:
     """
       art_illumina -rs 1 -ss HS25 -i {input} -l 120 -s 50 -c 150000 -o {params.out}
@@ -174,6 +178,8 @@ rule wgs_simulation:
     "output/lanl/{lanl_id}/wgs.fastq"
   params:
     out="output/lanl/{lanl_id}/wgs"
+  conda:
+    "envs/ngs.yml"
   shell:
     """
       art_illumina -rs 1 -ss HS25 --samout -i {input} -l 120 -s 50 -c 150000 -o {params.out}
@@ -203,6 +209,8 @@ rule wgs_simulation_true_sequences:
   output:
     sam="output/wgs-simulation_{simulated_dataset}/{reference}_truth.sam",
     fasta="output/wgs-simulation_{simulated_dataset}/{reference}_truth.fasta"
+  conda:
+    "envs/veg.yml"
   shell:
     """
       bealign -r {input.reference} {input.wgs} {output.sam}
@@ -242,6 +250,8 @@ rule all_lanl_genes:
     sam="output/lanl/{reference}.sam",
     fasta="output/lanl/{reference}.fasta",
     csv=temp("output/lanl/{reference}-no_subtypes.csv")
+  conda:
+    "envs/veg.yml"
   shell:
     """
       bealign -r {input.reference} {input.lanl} {output.sam}
@@ -262,6 +272,8 @@ rule genome_distances:
     "input/LANL-HIV-aligned.fasta"
   output:
     temp("output/lanl/distances-no_subtypes.csv")
+  conda:
+    "envs/veg.yml"
   shell:
     "tn93 -t 1 -o {output} {input}"
 
@@ -319,6 +331,8 @@ rule qfilt:
     html="output/{dataset}/reads_fastqc.html"
   params:
     dir="output/{dataset}"
+  conda:
+    "envs/veg.yml"
   shell:
     """
       qfilt -Q {input} -q 20 -l 50 -j >> {output.fasta} 2>> {output.json}
@@ -346,6 +360,8 @@ rule qfilt_454:
   output:
     fasta="output/{dataset}/qfilt/qc.fasta",
     json="output/{dataset}/qfilt/qc.json"
+  conda:
+    "envs/veg.yml"
   shell:
     "qfilt -F {input.fasta} {input.qual} -q 20 -l 50 -j >> {output.fasta} 2>> {output.json}"
 
@@ -357,6 +373,8 @@ rule fastp:
     fasta="output/{dataset}/fastp/qc.fasta",
     json="output/{dataset}/fastp/qc.json",
     html="output/{dataset}/fastp/qc.html"
+  conda:
+    "envs/ngs.yml"
   shell:
     """
       fastp -A -q 15 -i {input} -o {output.fastq} -j {output.json} -h {output.html} -n 50
@@ -368,6 +386,8 @@ rule trimmomatic:
     rules.situate_data.output[0]
   output:
     "output/{dataset}/trimmomatic/qc.fastq"
+  conda:
+    "envs/ngs.yml"
   shell:
     "trimmomatic SE {input} {output} ILLUMINACLIP:TruSeq3-SE:2:30:10 LEADING:3 TRAILING:3 SLIDINGWINDOW:4:15 MINLEN:36"
 
@@ -380,6 +400,8 @@ rule bealign:
   output:
     bam="output/{dataset}/{qc}/bealign/{reference}/mapped.bam",
     discards="output/{dataset}/{qc}/bealign/{reference}/discards.fasta"
+  conda:
+    "envs/veg.yml"
   shell:
     "bealign -r {input.reference} -e 0.5 -m HIV_BETWEEN_F -D {output.discards} -R {input.qc} {output.bam}"
 
@@ -397,6 +419,8 @@ rule bwa_map_reads:
     reference="output/references/{reference}.fasta"
   output:
     "output/{dataset}/{qc}/bwa/{reference}/mapped.bam"
+  conda:
+    "envs/ngs.yml"
   shell:
     """
       bwa index {input.reference}
@@ -412,6 +436,8 @@ rule bowtie2:
     bam="output/{dataset}/{qc}/bowtie2/{reference}/mapped.bam"
   params:
     lambda wildcards: "output/references/%s" % wildcards.reference
+  conda:
+    "envs/ngs.yml"
   shell:
     """
       bowtie2-build {input.reference} {params}
@@ -426,6 +452,8 @@ rule sort_and_index:
     bam="output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.bam",
     sam="output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.sam",
     index="output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.bam.bai"
+  conda:
+    "envs/ngs.yml"
   shell:
     """
       samtools sort {input} > {output.bam}
@@ -447,6 +475,8 @@ rule sorted_fasta:
     rules.sort_and_index.output.bam
   output:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.fasta"
+  conda:
+    "envs/veg.yml"
   shell:
     "bam2msa {input} {output}"
 
@@ -457,6 +487,8 @@ rule qualimap:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/qualimapReport.html"
   params:
     dir="output/{dataset}/{qc}/{read_mapper}/{reference}"
+  conda:
+    "envs/ngs.yml"
   shell:
     "qualimap bamqc -bam {input} -outdir {params.dir}"
 
@@ -625,6 +657,8 @@ rule mmvc:
   output:
     json="output/{dataset}/{qc}/{read_mapper}/{reference}/mmvc.json",
     fasta="output/{dataset}/{qc}/{read_mapper}/{reference}/mmvc.fasta"
+  conda:
+    "envs/veg.yml"
   shell:
     "mmvc -j {output.json} -f {output.fasta} {input}"
 
@@ -633,6 +667,8 @@ rule readreduce:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/mmvc.fasta"
   output:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/veg/haplosuperreads.fasta"
+  conda:
+    "envs/veg.yml"
   shell:
     "readreduce -a resolve -l 30 -s 16 -o {output} {input}"
 
@@ -758,6 +794,8 @@ rule haplotypes_and_truth_heatmap:
     rules.haplotypes_and_truth.output.csv
   output:
     png="output/{dataset}/{qc}/{read_mapper}/{reference}/{haplotyper}/truth_and_haplotypes.png"
+  conda:
+    "envs/R.yml"
   script:
     "R/truth_heatmap.R"
 
@@ -775,6 +813,8 @@ rule downsampling_accuracy:
       "output/{{dataset}}/{{qc}}/{{read_mapper}}/{{reference}}/acme/ds_{downsample}/covarying_truth.json",
       downsample=[0, 20, 40, 60, 80]
     )
+  conda:
+    "envs/R.yml"
   output:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/downsampling.png"
   script:
