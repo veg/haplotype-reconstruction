@@ -159,6 +159,9 @@ def extract_5vm_truth(input_fasta, reference_path, output_path):
         aligned_sequence = list(SeqIO.parse(alignment_path, "fasta"))[0]
         aligned_sequence.seq = aligned_sequence.seq.ungap('-')
         aligned_sequences.append(aligned_sequence)
+    sequence_length = min([len(record.seq) for record in aligned_sequences])
+    for record in aligned_sequences:
+        record.seq = record.seq[:sequence_length]
     SeqIO.write(aligned_sequences, output_path, "fasta")
 
 
