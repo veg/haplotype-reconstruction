@@ -681,7 +681,7 @@ rule error_correction:
     bam="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/ds_{downsample}/corrected.bam",
     index="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/ds_{downsample}/corrected.bam.bai",
     json="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/ds_{downsample}/covarying_sites.json",
-    consensus="output/{dataset}/{qc}/{read_mapper}/{reference}/ds_{downsample}/acme/consensus.fasta",
+    consensus="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/ds_{downsample}/consensus.fasta",
   run:
     error_correction_io(
       input[0],
