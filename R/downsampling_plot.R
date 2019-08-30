@@ -11,5 +11,10 @@ plot_data <- tibble(
 plot_data
 
 ggplot(plot_data) + 
-  geom_bar(aes(x=downsampling, y=value, fill=statistic), stat="identity", position="dodge")
+  geom_bar(
+    aes(x=downsampling, y=value, fill=statistic),
+    stat="identity",
+    position="dodge"
+  ) + 
+  scale_x_continuous(breaks=c(0, 20, 40, 60, 80))
 ggsave(snakemake@output[[1]], width=8, height=8)
