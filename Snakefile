@@ -633,21 +633,16 @@ rule abayesqr:
     shell("mv test_ViralSeq.txt {output.viralseq}")
     parse_abayesqr_output(output.viralseq, output.fasta)
 
-rule all_abayesqr:
+rule shorah:
   input:
-    expand(
-      "output/{dataset}/qfilt/bealign/{reference}/abayesqr/haplotypes.fasta",
-      dataset=ALL_DATASETS,
-      reference=ALL_REFERENCES
-    )
-
-rule abayesqr_intrahost:
-  input:
-    expand(
-      "output/{dataset}/qfilt/bealign/{reference}/abayesqr/haplotypes.fasta",
-      dataset=ACCESSION_NUMBERS,
-      reference=REFERENCE_SUBSET
-    )
+    bam=rules.sort_and_index.output.bam,
+    reference=rules.situate_references.output[0]
+  output:
+    fasta="output/{dataset}/{qc}/{read_mapper}/{reference}/shorah/haplotypes.fasta"
+  conda:
+    "envs/shorah.yml"
+  shell:
+    "shorah.py -b {input.bam} -f {input.reference}"
 
 # VEG haplotype reconstruction
 
