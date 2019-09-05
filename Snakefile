@@ -806,7 +806,7 @@ rule downsampling_accuracy:
   input:
     expand(
       "output/{{dataset}}/{{qc}}/{{read_mapper}}/{{reference}}/acme/ds_{downsample}/covarying_truth.json",
-      downsample=[0, 20, 40, 60, 80]
+      downsample=range(90,100)
     )
   conda:
     "envs/R.yml"
