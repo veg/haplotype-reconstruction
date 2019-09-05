@@ -639,10 +639,18 @@ rule shorah:
     reference=rules.situate_references.output[0]
   output:
     fasta="output/{dataset}/{qc}/{read_mapper}/{reference}/shorah/haplotypes.fasta"
+  params:
+    workdir="output/{dataset}/{qc}/{read_mapper}/{reference}/shorah",
+    bam="../sorted.bam",
+    reference="../../../../../references/{reference}.fasta"
   conda:
     "envs/shorah.yml"
   shell:
-    "shorah.py -b {input.bam} -f {input.reference}"
+    """
+      cd {params.workdir}
+      shorah.py -b {params.bam} -f {params.reference} -w 51
+      mv sorted_global_haps.fasta haplotypes.fasta
+    """
 
 # VEG haplotype reconstruction
 
@@ -814,6 +822,17 @@ rule downsampling_accuracy:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/downsampling.png"
   script:
     "R/downsampling_plot.R"
+
+rule known:
+  input:
+    expand(
+      "output/{dataset}/{{qc}}/{{read_mapper}}/{{reference}}/{{haplotyper}}/haplotypes.fasta",
+      dataset=KNOWN_TRUTH
+    )
+  output:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/{haplotyper}/known_results.json",
+  shell:
+    "touch {output}"
 
 # Regress Haplo
 
