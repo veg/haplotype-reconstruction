@@ -21,6 +21,7 @@ from py import pairwise_distance_csv
 from py import add_subtype_information
 from py import covarying_truth
 from py import downsample_bam
+from py import pluck_record
 
 
 with open('simulations.json') as simulation_file:
@@ -217,23 +218,6 @@ rule wgs_simulation_true_sequences:
       bam2msa {output.sam} {output.fasta}
     """
 
-rule FVM_true_sequences:
-  input:
-    wgs="input/5VM.fasta",
-    reference="input/references/{reference}.fasta"
-  output:
-    fasta="output/FiveVirusMixIllumina_1/{reference}_truth.fasta"
-  run:
-    extract_5vm_truth(input.wgs, input.reference, output.fasta)
-
-rule FVM_true_covarying:
-  input:
-    "output/FiveVirusMixIllumina_1/{reference}_truth.fasta"
-  output:
-    "output/FiveVirusMixIllumina_1/{reference}_truth.json"
-  run:
-    covarying_sites(input[0], output[0])
-
 rule wgs_simulation_true_covarying_sites:
   input:
     rules.wgs_simulation_true_sequences.output.fasta
@@ -284,6 +268,33 @@ rule genome_distances_with_subtypes:
     "output/lanl/distances.csv"
   run:
     add_subtype_information(input[0], output[0])
+
+# Five Virus Mixture
+
+rule FVM_true_sequences:
+  input:
+    wgs="input/5VM.fasta",
+    reference="input/references/{reference}.fasta"
+  output:
+    fasta="output/FiveVirusMixIllumina_1/{reference}_truth.fasta"
+  run:
+    extract_5vm_truth(input.wgs, input.reference, output.fasta)
+
+rule FVM_true_covarying:
+  input:
+    "output/FiveVirusMixIllumina_1/{reference}_truth.fasta"
+  output:
+    "output/FiveVirusMixIllumina_1/{reference}_truth.json"
+  run:
+    covarying_sites(input[0], output[0])
+
+rule FVM_references:
+  input:
+    "input/5VM.fasta"
+  output:
+    "output/FiveVirusMixIllumina_1/{reference}.fasta"
+  run:
+    pluck_record(input[0], output[0], wildcards.reference)
 
 # Situating other data
 

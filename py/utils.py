@@ -224,3 +224,9 @@ def downsample_bam(input_bam_path, output_bam_path, downsample_amount):
     output_bam.close()
     pysam.index(output_bam_path)
     input_bam.close()
+
+
+def pluck_record(input_fasta_path, output_fasta_path, record):
+    all_records = SeqIO.parse(input_fasta_path, 'fasta')
+    desired_record = SeqIO.to_dict(all_records)[record]
+    SeqIO.write(desired_record, output_fasta_path, 'fasta')
