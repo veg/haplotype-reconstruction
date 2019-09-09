@@ -292,9 +292,42 @@ rule FVM_references:
   input:
     "input/5VM.fasta"
   output:
-    "output/FiveVirusMixIllumina_1/{reference}.fasta"
+    "output/FiveVirusMixIllumina_1/{reference}/ref.fasta"
   run:
     pluck_record(input[0], output[0], wildcards.reference)
+
+rule mapped_reads:
+  input:
+    reference=rules.FVM_references.output[0],
+    reads='output/FiveVirusMixIllumina_1/reads.fastq'
+  output:
+    qc="output/FiveVirusMixIllumina_1/{reference}/qc.fastq",
+    json="output/FiveVirusMixIllumina_1/{reference}/qc.json",
+    html="output/FiveVirusMixIllumina_1/{reference}/qc.html",
+    sam="output/FiveVirusMixIllumina_1/{reference}/mapped.sam",
+    bam="output/FiveVirusMixIllumina_1/{reference}/mapped.bam",
+    sort="output/FiveVirusMixIllumina_1/{reference}/sorted.bam",
+    index="output/FiveVirusMixIllumina_1/{reference}/sorted.bam.bai"
+  params:
+    lambda wildcards: "output/FiveVirusMixIllumina_1/%s" % wildcards.reference
+  conda:
+    "envs/ngs.yml"
+  shell:
+    """
+      fastp -A -q 15 -i {input.reads} -o {output.qc} -j {output.json} -h {output.html} -n 50
+      bowtie2-build {input.reference} {params}
+      bowtie2 -x {params} -U {output.qc} -S {output.sam}
+      samtools view -Sb {output.sam} > {output.bam}
+      samtools sort {output.bam} > {output.sort}
+      samtools index {output.sort}
+    """
+    
+rule all_fvm_bams:
+  input:
+    expand(
+      "output/FiveVirusMixIllumina_1/{reference}/sorted.bam",
+      reference=['89.6', 'HXB2', 'JRCSF', 'NL43', 'YU2']
+    )
 
 # Situating other data
 
