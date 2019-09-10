@@ -22,6 +22,8 @@ from py import add_subtype_information
 from py import covarying_truth
 from py import downsample_bam
 from py import pluck_record
+from py import single_fvm_mapping_dataset
+from py import full_fvm_mapping_dataset
 
 
 with open('simulations.json') as simulation_file:
@@ -39,6 +41,7 @@ RECONSTRUCTION_DATASETS = [
 SRA = [
   "SRX3661402"
 ]
+FVM_RECORDS = ['89_6', 'HXB2', 'JRCSF', 'NL43', 'YU2']
 ALL_DATASETS = ACCESSION_NUMBERS + SIMULATED_DATASETS + RECONSTRUCTION_DATASETS
 KNOWN_TRUTH = SIMULATED_DATASETS + ["FiveVirusMixIllumina_1"]
 ALL_REFERENCES = ["env", "rev", "vif", "pol", "prrt", "rt", "pr", "gag", "int", "tat"] # + ["nef", "vpr"] 
@@ -296,7 +299,7 @@ rule FVM_references:
   run:
     pluck_record(input[0], output[0], wildcards.reference)
 
-rule mapped_reads:
+rule fvm_mapped_reads:
   input:
     reference=rules.FVM_references.output[0],
     reads='output/FiveVirusMixIllumina_1/reads.fastq'
@@ -314,7 +317,7 @@ rule mapped_reads:
     "envs/ngs.yml"
   shell:
     """
-      fastp -A -q 15 -i {input.reads} -o {output.qc} -j {output.json} -h {output.html} -n 50
+      fastp -A -q 20 -i {input.reads} -o {output.qc} -j {output.json} -h {output.html} -n 50
       bowtie2-build {input.reference} {params}
       bowtie2 -x {params} -U {output.qc} -S {output.sam}
       samtools view -Sb {output.sam} > {output.bam}
@@ -322,12 +325,26 @@ rule mapped_reads:
       samtools index {output.sort}
     """
     
-rule all_fvm_bams:
+rule single_fvm_mapping_data:
+  input:
+    bam=rules.fvm_mapped_reads.output.sort,
+    reference=rules.FVM_references.output[0]
+  output:
+    "output/FiveVirusMixIllumina_1/{reference}/mapping_data.csv"
+  run:
+    single_fvm_mapping_dataset(input.bam, input.reference, wildcards.reference, output[0])
+
+rule all_fvm_mapping_data:
   input:
     expand(
-      "output/FiveVirusMixIllumina_1/{reference}/sorted.bam",
-      reference=['89.6', 'HXB2', 'JRCSF', 'NL43', 'YU2']
+      "output/FiveVirusMixIllumina_1/{reference}/mapping_data.csv",
+      reference=FVM_RECORDS
     )
+  output:
+    wide="output/FiveVirusMixIllumina_1/mapping_data_wide.csv",
+    long="output/FiveVirusMixIllumina_1/mapping_data_long.csv"
+  run:
+    full_fvm_mapping_dataset(input, output.wide, output.long)
 
 # Situating other data
 

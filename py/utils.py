@@ -230,3 +230,54 @@ def pluck_record(input_fasta_path, output_fasta_path, record):
     all_records = SeqIO.parse(input_fasta_path, 'fasta')
     desired_record = SeqIO.to_dict(all_records)[record]
     SeqIO.write(desired_record, output_fasta_path, 'fasta')
+
+
+def single_fvm_mapping_dataset(bam_path, ref_path, dataset, output_path):
+    bam_path = 'output/FiveVirusMixIllumina_1/%s/sorted.bam' % dataset
+    ref_path = 'output/FiveVirusMixIllumina_1/%s/ref.fasta' % dataset
+    bam = pysam.AlignmentFile(bam_path)
+    ref = SeqIO.read(ref_path, 'fasta')
+    percent_identity = np.zeros(bam.mapped, dtype=np.float)
+    differences = np.zeros(bam.mapped, dtype=np.float)
+    number_of_aligned_pairs = np.zeros(bam.mapped, dtype=np.float)
+    for i, read in enumerate(bam.fetch()):
+        aligned_pairs = read.get_aligned_pairs(matches_only=True)
+        aligned_query = np.array([read.query[pair[0]] for pair in aligned_pairs], dtype='<U1')
+        aligned_reference = np.array([ref[pair[1]] for pair in aligned_pairs], dtype='<U1')
+        agreement = (aligned_query == aligned_reference).sum()
+        number_of_aligned_pairs[i] = len(aligned_pairs)
+        differences[i] = number_of_aligned_pairs[i] - agreement
+        percent_identity[i] = agreement/number_of_aligned_pairs[i]
+    
+    quality = np.array([read.mapping_quality for read in bam.fetch()], dtype=np.int)
+    query_length = np.array([read.query_length for read in bam.fetch()], dtype=np.int)
+    result = pd.DataFrame({
+        '%s_mapping_quality' % dataset: quality,
+        '%s_differences' % dataset: differences,
+        '%s_number_of_aligned_pairs' % dataset: number_of_aligned_pairs,
+        '%s_percent_identity' % dataset: percent_identity,
+        '%s_query_length' % dataset: query_length
+    }, index=[read.query_name for read in bam.fetch()])
+    result.to_csv(output_path, index_label='read_id')
+
+
+def full_fvm_mapping_dataset(dataset_paths, output_wide_path, output_long_path):
+    all_datasets = list(map(
+        lambda path: pd.read_csv(path, index_col='read_id'),
+        dataset_paths
+    ))
+    pd.concat(all_datasets, axis=1, sort=True).to_csv(output_wide_path)
+    for dataset_path, dataset in zip(dataset_paths, all_datasets):
+        dataset_name = dataset_path.split('/')[-2]
+        dataset.reset_index(inplace=True)
+        column_renamer = {
+            'index': 'read_id',
+            '%s_mapping_quality' % dataset_name: 'mapping_quality',
+            '%s_differences' % dataset_name: 'differences',
+            '%s_number_of_aligned_pairs' % dataset_name: 'number_of_aligned_pairs',
+            '%s_percent_identity' % dataset_name : 'percent_identity',
+            '%s_query_length' % dataset_name: 'query_length'
+        }
+        dataset.rename(columns=column_renamer, inplace=True)
+        dataset['reference'] = dataset_name
+    pd.concat(all_datasets, axis=0, sort=False).to_csv(output_long_path)
