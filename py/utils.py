@@ -144,11 +144,9 @@ def extract_5vm_truth(input_fasta, reference_path, output_path):
     sequences = list(SeqIO.parse(input_fasta, "fasta"))
     aligned_sequences = []
     for sequence in sequences:
-        sequence_id = sequence.id.replace('.', '_')
         output_dir = os.path.join("output", "FiveVirusMixIllumina_1")
-        sequence_filename = "%s.fasta" % sequence_id
-        sequence_path = os.path.join(output_dir, sequence_filename)
-        alignment_path = os.path.join(output_dir, sequence_id + ".fasta")
+        sequence_path = os.path.join(output_dir, sequence.id, "ref.fasta")
+        alignment_path = os.path.join(output_dir, sequence.id, "aligned.fasta")
         SeqIO.write(sequence, alignment_path, "fasta")
         command = [
             "water", "-asequence", sequence_path, "-bsequence",

@@ -285,7 +285,7 @@ rule FVM_true_sequences:
 
 rule FVM_true_covarying:
   input:
-    "output/FiveVirusMixIllumina_1/{reference}_truth.fasta"
+    rules.FVM_true_sequences.output.fasta
   output:
     "output/FiveVirusMixIllumina_1/{reference}_truth.json"
   run:
@@ -312,7 +312,7 @@ rule fvm_mapped_reads:
     sort="output/FiveVirusMixIllumina_1/{reference}/sorted.bam",
     index="output/FiveVirusMixIllumina_1/{reference}/sorted.bam.bai"
   params:
-    lambda wildcards: "output/FiveVirusMixIllumina_1/%s" % wildcards.reference
+    lambda wildcards: "output/FiveVirusMixIllumina_1/%s/ref" % wildcards.reference
   conda:
     "envs/ngs.yml"
   shell:
