@@ -279,3 +279,28 @@ def full_fvm_mapping_dataset(dataset_paths, output_wide_path, output_long_path):
         dataset.rename(columns=column_renamer, inplace=True)
         dataset['reference'] = dataset_name
     pd.concat(all_datasets, axis=0, sort=False).to_csv(output_long_path)
+
+
+def true_covarying_kmers(input_fasta, input_json, output_csv, k):
+    k = int(k)
+    records = np.array([
+        list(record.seq)
+        for record in SeqIO.parse(input_fasta, 'fasta')
+    ], dtype='<U1')
+    data = {
+        **{'index_%d' % i: [] for i in range(k)},
+        **{'character_%d' % i: [] for i in range(k)}
+    }
+    with open(input_json) as json_file:
+        covarying_sites = np.array(json.load(json_file), dtype=np.int)
+    for i in range(len(covarying_sites) - k):
+        covarying_indices = covarying_sites[i:i+k]
+        covarying_kmers = set()
+        for row_index in range(records.shape[0]):
+            covarying_kmer = ''.join(records[row_index, covarying_indices])
+            covarying_kmers.add(covarying_kmer)
+        for covarying_kmer in list(covarying_kmers):
+            for i in range(k):
+                data['index_%d' % i].append(covarying_indices[i])
+                data['character_%d' % i].append(covarying_kmer[i])
+    pd.DataFrame(data).to_csv(output_csv, index=False)

@@ -24,6 +24,7 @@ from py import downsample_bam
 from py import pluck_record
 from py import single_fvm_mapping_dataset
 from py import full_fvm_mapping_dataset
+from py import true_covarying_kmers
 
 
 with open('simulations.json') as simulation_file:
@@ -345,6 +346,15 @@ rule all_fvm_mapping_data:
     long="output/FiveVirusMixIllumina_1/mapping_data_long.csv"
   run:
     full_fvm_mapping_dataset(input, output.wide, output.long)
+
+rule covarying_kmers:
+  input:
+    fasta=rules.FVM_true_sequences.output.fasta,
+    json=rules.FVM_true_covarying.output[0]
+  output:
+    "output/FiveVirusMixIllumina_1/{reference}_{k}mers.csv"
+  run:
+    true_covarying_kmers(input.fasta, input.json, output[0], wildcards.k)
 
 # Situating other data
 
