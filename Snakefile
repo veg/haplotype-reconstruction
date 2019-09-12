@@ -22,7 +22,7 @@ from py import add_subtype_information
 from py import covarying_truth
 from py import downsample_bam
 from py import pluck_record
-from py import single_fvm_mapping_dataset
+from py import single_mapping_dataset
 from py import full_fvm_mapping_dataset
 from py import true_covarying_kmers
 
@@ -273,89 +273,6 @@ rule genome_distances_with_subtypes:
   run:
     add_subtype_information(input[0], output[0])
 
-# Five Virus Mixture
-
-rule FVM_true_sequences:
-  input:
-    wgs="input/5VM.fasta",
-    reference="input/references/{reference}.fasta"
-  output:
-    fasta="output/FiveVirusMixIllumina_1/{reference}_truth.fasta"
-  run:
-    extract_5vm_truth(input.wgs, input.reference, output.fasta)
-
-rule FVM_true_covarying:
-  input:
-    rules.FVM_true_sequences.output.fasta
-  output:
-    "output/FiveVirusMixIllumina_1/{reference}_truth.json"
-  run:
-    covarying_sites(input[0], output[0])
-
-rule FVM_references:
-  input:
-    "input/5VM.fasta"
-  output:
-    "output/FiveVirusMixIllumina_1/{reference}/ref.fasta"
-  run:
-    pluck_record(input[0], output[0], wildcards.reference)
-
-rule fvm_mapped_reads:
-  input:
-    reference=rules.FVM_references.output[0],
-    reads='output/FiveVirusMixIllumina_1/reads.fastq'
-  output:
-    qc="output/FiveVirusMixIllumina_1/{reference}/qc.fastq",
-    json="output/FiveVirusMixIllumina_1/{reference}/qc.json",
-    html="output/FiveVirusMixIllumina_1/{reference}/qc.html",
-    sam="output/FiveVirusMixIllumina_1/{reference}/mapped.sam",
-    bam="output/FiveVirusMixIllumina_1/{reference}/mapped.bam",
-    sort="output/FiveVirusMixIllumina_1/{reference}/sorted.bam",
-    index="output/FiveVirusMixIllumina_1/{reference}/sorted.bam.bai"
-  params:
-    lambda wildcards: "output/FiveVirusMixIllumina_1/%s/ref" % wildcards.reference
-  conda:
-    "envs/ngs.yml"
-  shell:
-    """
-      fastp -A -q 20 -i {input.reads} -o {output.qc} -j {output.json} -h {output.html} -n 50
-      bowtie2-build {input.reference} {params}
-      bowtie2 -x {params} -U {output.qc} -S {output.sam}
-      samtools view -Sb {output.sam} > {output.bam}
-      samtools sort {output.bam} > {output.sort}
-      samtools index {output.sort}
-    """
-    
-rule single_fvm_mapping_data:
-  input:
-    bam=rules.fvm_mapped_reads.output.sort,
-    reference=rules.FVM_references.output[0]
-  output:
-    "output/FiveVirusMixIllumina_1/{reference}/mapping_data.csv"
-  run:
-    single_fvm_mapping_dataset(input.bam, input.reference, wildcards.reference, output[0])
-
-rule all_fvm_mapping_data:
-  input:
-    expand(
-      "output/FiveVirusMixIllumina_1/{reference}/mapping_data.csv",
-      reference=FVM_RECORDS
-    )
-  output:
-    wide="output/FiveVirusMixIllumina_1/mapping_data_wide.csv",
-    long="output/FiveVirusMixIllumina_1/mapping_data_long.csv"
-  run:
-    full_fvm_mapping_dataset(input, output.wide, output.long)
-
-rule covarying_kmers:
-  input:
-    fasta=rules.FVM_true_sequences.output.fasta,
-    json=rules.FVM_true_covarying.output[0]
-  output:
-    "output/FiveVirusMixIllumina_1/{reference}_{k}mers.csv"
-  run:
-    true_covarying_kmers(input.fasta, input.json, output[0], wildcards.k)
-
 # Situating other data
 
 rule sra_dataset:
@@ -476,9 +393,14 @@ rule bealign:
   shell:
     "bealign -r {input.reference} -e 0.5 -m HIV_BETWEEN_F -D {output.discards} -R {input.qc} {output.bam}"
 
+def situate_reference_input(wildcards):
+  if wildcards.reference in FVM_RECORDS:
+    return "output/FiveVirusMixIllumina_1/%s.fasta" % wildcards.reference
+  return "input/references/%s.fasta" % wildcards.reference
+
 rule situate_references:
   input:
-    "input/references/{reference}.fasta"
+    situate_reference_input
   output:
     "output/references/{reference}.fasta"
   shell:
@@ -839,6 +761,64 @@ rule regression:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/ds_{downsample}/haplotypes.fasta",
   run:
     regression_io(input.superreads, input.describing, input.candidates_fasta, output[0])
+
+# Known truth
+
+rule single_mapping_data:
+  input:
+    bam=rules.sort_and_index.output.bam,
+    reference=rules.situate_references.output[0]
+  output:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/mapping_data.csv"
+  run:
+    single_mapping_dataset(input.bam, input.reference, output[0])
+
+# Five Virus Mixture
+
+rule FVM_true_sequences:
+  input:
+    wgs="input/5VM.fasta",
+    reference="input/references/{reference}.fasta"
+  output:
+    fasta="output/FiveVirusMixIllumina_1/{reference}_truth.fasta"
+  run:
+    extract_5vm_truth(input.wgs, input.reference, output.fasta)
+
+rule FVM_true_covarying:
+  input:
+    rules.FVM_true_sequences.output.fasta
+  output:
+    "output/FiveVirusMixIllumina_1/{reference}_truth.json"
+  run:
+    covarying_sites(input[0], output[0])
+
+rule FVM_references:
+  input:
+    "input/5VM.fasta"
+  output:
+    "output/FiveVirusMixIllumina_1/{strain}.fasta"
+  run:
+    pluck_record(input[0], output[0], wildcards.strain)
+ 
+rule all_fvm_mapping_data:
+  input:
+    expand(
+      "output/FiveVirusMixIllumina_1/{{qc}}/{{read_mapper}}/{dataset}/mapping_data.csv",
+      dataset=FVM_RECORDS
+    )
+  output:
+    "output/FiveVirusMixIllumina_1/{qc}/{read_mapper}/mapping_data.csv"
+  run:
+    full_fvm_mapping_dataset(input, output[0])
+
+rule covarying_kmers:
+  input:
+    fasta=rules.FVM_true_sequences.output.fasta,
+    json=rules.FVM_true_covarying.output[0]
+  output:
+    "output/FiveVirusMixIllumina_1/strain_{strain}_{k}mers.csv"
+  run:
+    true_covarying_kmers(input.fasta, input.json, output[0], wildcards.k)
 
 # Results
 

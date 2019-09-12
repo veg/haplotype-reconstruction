@@ -47,7 +47,6 @@ def select_simulated_gene(dataset, gene, output):
     nucleotide_genome_filename = "output/simulation/%s/genome.fasta" % dataset
     nucleotide_genome = SeqIO.read(nucleotide_genome_filename, 'fasta')
     max_percent_identity = 0
-    desired_i = 0
     for i in range(3):
         non_gaps = 0
         matches = 0
@@ -68,7 +67,6 @@ def select_simulated_gene(dataset, gene, output):
         percent_identity = matches/non_gaps
         if percent_identity > max_percent_identity:
             max_percent_identity = percent_identity
-            desired_i = i
             desired_codons = ''.join(codon_list)
     record = SeqRecord(
         Seq(desired_codons).ungap('-'),
@@ -79,7 +77,7 @@ def select_simulated_gene(dataset, gene, output):
 
 
 def write_abayesqr_config(sam_filename, reference_filename, output):
-  config_string = ("""filename of reference sequence (FASTA) : %s
+    config_string = ("""filename of reference sequence (FASTA) : %s
 filname of the aligned reads (sam format) : %s
 paired-end (1 = true, 0 = false) : 0
 SNV_thres : 0.01
@@ -90,9 +88,9 @@ min_read_length : 50
 max_insert_length : 250
 characteristic zone name : test
 seq_err (assumed sequencing error rate(%%)) : 0.1
-MEC improvement threshold : 0.0395 """ % (reference_filename, sam_filename) )
-  with open(output, 'w') as config_file:
-    config_file.write(config_string)
+MEC improvement threshold : 0.0395 """ % (reference_filename, sam_filename))
+    with open(output, 'w') as config_file:
+        config_file.write(config_string)
 
 
 def parse_abayesqr_output(input_text, output_fasta):
@@ -163,7 +161,9 @@ def extract_5vm_truth(input_fasta, reference_path, output_path):
     SeqIO.write(aligned_sequences, output_path, "fasta")
 
 
-def covarying_truth(input_computed, input_actual, input_reference, output_json):
+def covarying_truth(
+        input_computed, input_actual, input_reference, output_json
+        ):
     reference = SeqIO.read(input_reference, 'fasta')
     rl = len(reference.seq)
     with open(input_computed) as input_file:
@@ -179,11 +179,11 @@ def covarying_truth(input_computed, input_actual, input_reference, output_json):
     for i in range(rl):
         if i in true_cvs and i in cvs:
             tp.append(i)
-        elif i in true_cvs and not i in cvs:
+        elif i in true_cvs and i not in cvs:
             fn.append(i)
-        elif not i in true_cvs and i in cvs:
+        elif i not in true_cvs and i in cvs:
             fp.append(i)
-        elif not i in true_cvs and not i in cvs:
+        elif i not in true_cvs and i not in cvs:
             tn.append(i)
     precision = len(tp)/(len(tp)+len(fp))
     recall = len(tp)/(len(tp)+len(fn))
@@ -203,7 +203,8 @@ def downsample_bam(input_bam_path, output_bam_path, downsample_amount):
     downsample_percentage = 1 - int(downsample_amount) / 100
     input_bam = pysam.AlignmentFile(input_bam_path, 'rb')
     number_of_reads = input_bam.count()
-    downsample_number = np.ceil(downsample_percentage * number_of_reads).astype(np.int)
+    downsample_number = np.ceil(downsample_percentage * number_of_reads) \
+        .astype(np.int)
     np.random.seed(1)
     downsample_indices = np.random.choice(
         number_of_reads, downsample_number, replace=False
@@ -230,9 +231,7 @@ def pluck_record(input_fasta_path, output_fasta_path, record):
     SeqIO.write(desired_record, output_fasta_path, 'fasta')
 
 
-def single_fvm_mapping_dataset(bam_path, ref_path, dataset, output_path):
-    bam_path = 'output/FiveVirusMixIllumina_1/%s/sorted.bam' % dataset
-    ref_path = 'output/FiveVirusMixIllumina_1/%s/ref.fasta' % dataset
+def single_mapping_dataset(bam_path, ref_path, output_path):
     bam = pysam.AlignmentFile(bam_path)
     ref = SeqIO.read(ref_path, 'fasta')
     percent_identity = np.zeros(bam.mapped, dtype=np.float)
@@ -240,45 +239,43 @@ def single_fvm_mapping_dataset(bam_path, ref_path, dataset, output_path):
     number_of_aligned_pairs = np.zeros(bam.mapped, dtype=np.float)
     for i, read in enumerate(bam.fetch()):
         aligned_pairs = read.get_aligned_pairs(matches_only=True)
-        aligned_query = np.array([read.query[pair[0]] for pair in aligned_pairs], dtype='<U1')
-        aligned_reference = np.array([ref[pair[1]] for pair in aligned_pairs], dtype='<U1')
+        aligned_query = np.array([
+            read.query[pair[0]] for pair in aligned_pairs
+        ], dtype='<U1')
+        aligned_reference = np.array([
+            ref[pair[1]] for pair in aligned_pairs
+        ], dtype='<U1')
         agreement = (aligned_query == aligned_reference).sum()
         number_of_aligned_pairs[i] = len(aligned_pairs)
         differences[i] = number_of_aligned_pairs[i] - agreement
         percent_identity[i] = agreement/number_of_aligned_pairs[i]
-    
-    quality = np.array([read.mapping_quality for read in bam.fetch()], dtype=np.int)
-    query_length = np.array([read.query_length for read in bam.fetch()], dtype=np.int)
+
+    quality = np.array([
+        read.mapping_quality for read in bam.fetch()
+    ], dtype=np.int)
+    query_length = np.array([
+        read.query_length for read in bam.fetch()
+    ], dtype=np.int)
     result = pd.DataFrame({
-        '%s_mapping_quality' % dataset: quality,
-        '%s_differences' % dataset: differences,
-        '%s_number_of_aligned_pairs' % dataset: number_of_aligned_pairs,
-        '%s_percent_identity' % dataset: percent_identity,
-        '%s_query_length' % dataset: query_length
+        'mapping_quality': quality,
+        'differences': differences,
+        'number_of_aligned_pairs': number_of_aligned_pairs,
+        'percent_identity': percent_identity,
+        'query_length': query_length
     }, index=[read.query_name for read in bam.fetch()])
     result.to_csv(output_path, index_label='read_id')
 
 
-def full_fvm_mapping_dataset(dataset_paths, output_wide_path, output_long_path):
+def full_fvm_mapping_dataset(dataset_paths, output_csv_path):
     all_datasets = list(map(
         lambda path: pd.read_csv(path, index_col='read_id'),
         dataset_paths
     ))
-    pd.concat(all_datasets, axis=1, sort=True).to_csv(output_wide_path)
     for dataset_path, dataset in zip(dataset_paths, all_datasets):
         dataset_name = dataset_path.split('/')[-2]
-        dataset.reset_index(inplace=True)
-        column_renamer = {
-            'index': 'read_id',
-            '%s_mapping_quality' % dataset_name: 'mapping_quality',
-            '%s_differences' % dataset_name: 'differences',
-            '%s_number_of_aligned_pairs' % dataset_name: 'number_of_aligned_pairs',
-            '%s_percent_identity' % dataset_name : 'percent_identity',
-            '%s_query_length' % dataset_name: 'query_length'
-        }
-        dataset.rename(columns=column_renamer, inplace=True)
         dataset['reference'] = dataset_name
-    pd.concat(all_datasets, axis=0, sort=False).to_csv(output_long_path)
+    pd.concat(all_datasets, axis=0, sort=False, ignore_index=True) \
+        .to_csv(output_csv_path)
 
 
 def true_covarying_kmers(input_fasta, input_json, output_csv, k):
