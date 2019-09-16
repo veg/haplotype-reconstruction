@@ -432,15 +432,6 @@ rule sort_and_index:
       samtools index {output.bam}
     """
 
-rule downsample:
-  input:
-    rules.sort_and_index.output.bam
-  output:
-    bam="output/{dataset}/{qc}/{read_mapper}/{reference}/sorted-ds_{downsample}.bam",
-    bai="output/{dataset}/{qc}/{read_mapper}/{reference}/sorted-ds_{downsample}.bam.bai"
-  run:
-    downsample_bam(input[0], output.bam, wildcards.downsample)
-
 rule sorted_fasta:
   input:
     rules.sort_and_index.output.bam
@@ -650,16 +641,16 @@ rule readreduce:
 
 rule error_correction:
   input:
-    rules.downsample.output.bam
+    rules.sort_and_index.output.bam
   output:
-    bam="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/ds_{downsample}/corrected.bam",
-    index="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/ds_{downsample}/corrected.bam.bai",
-    json="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/ds_{downsample}/covarying_sites.json",
-    consensus="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/ds_{downsample}/consensus.fasta",
+    bam="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/corrected.bam",
+    index="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/corrected.bam.bai",
+    json="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/covarying_sites.json",
+    consensus="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/consensus.fasta",
   run:
     error_correction_io(
-      input[0],
-      output.bam, output.json, output.consensus,
+      input[0], output.bam, True,
+      output.json, output.consensus,
       end_correction=10
     )
 
@@ -669,15 +660,15 @@ rule covarying_truth:
     actual="output/{dataset}/{reference}_truth.json",
     reference=rules.situate_references.output[0]
   output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/ds_{downsample}/covarying_truth.json"
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/covarying_truth.json"
   run:
     covarying_truth(input.computed, input.actual, input.reference, output[0])
 
 rule error_correction_fasta:
   input:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/ds_{downsample}/corrected.bam"
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/corrected.bam"
   output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/ds_{downsample}/corrected.fasta"
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/corrected.fasta"
   shell:
     "bam2msa {input} {output}"
 
@@ -687,11 +678,11 @@ rule superread:
     json=rules.error_correction.output.json,
     consensus=rules.error_correction.output.consensus,
   output:
-    full="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/ds_{downsample}/superreads-full.fasta",
-    cvs="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/ds_{downsample}/superreads-cvs.fasta",
-    describing="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/ds_{downsample}/describing.json",
-    graph="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/ds_{downsample}/graph.json",
-    candidates="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/ds_{downsample}/candidates.fasta"
+    full="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/superreads-full.fasta",
+    cvs="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/superreads-cvs.fasta",
+    describing="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/describing.json",
+    graph="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/graph.json",
+    candidates="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/candidates.fasta"
   run:
     read_graph_io(
       input.bam, input.json, input.consensus,
@@ -708,7 +699,7 @@ rule truth_and_superreads:
     truth=reference_input,
     superreads=rules.superread.output.full
   output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/ds_{downsample}/truth_and_superreads.fasta"
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/truth_and_superreads.fasta"
   shell:
     "cat {input.truth} {input.superreads} > {output}"
 
@@ -717,7 +708,7 @@ rule truth_and_candidates:
     candidates=rules.superread.output.candidates,
     truth=reference_input
   output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/ds_{downsample}/truth_and_candidates.fasta"
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/truth_and_candidates.fasta"
   shell:
     "cat {input.truth} {input.candidates} > {output}"
 
@@ -726,7 +717,7 @@ rule truth_and_candidates_diagnostics:
     candidates=rules.superread.output.candidates,
     truth=reference_input
   output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/ds_{downsample}/truth_and_candidates.json"
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/truth_and_candidates.json"
   run:
     evaluate(input.candidates, input.truth, output[0])
 
@@ -736,7 +727,7 @@ rule regression:
     describing=rules.superread.output.describing,
     candidates_fasta=rules.superread.output.candidates
   output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/ds_{downsample}/haplotypes.fasta",
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/haplotypes.fasta",
   run:
     regression_io(input.superreads, input.describing, input.candidates_fasta, output[0])
 
@@ -852,19 +843,6 @@ rule dashboard:
     path="output/{dataset}/{qc}/{read_mapper}/{reference}",
   shell:
     "npx webpack --output-path {params.path}"
-
-rule downsampling_accuracy:
-  input:
-    expand(
-      "output/{{dataset}}/{{qc}}/{{read_mapper}}/{{reference}}/acme/ds_{downsample}/covarying_truth.json",
-      downsample=range(90,100)
-    )
-  conda:
-    "envs/R.yml"
-  output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/downsampling.png"
-  script:
-    "R/downsampling_plot.R"
 
 rule known:
   input:
