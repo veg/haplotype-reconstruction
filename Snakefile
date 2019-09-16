@@ -12,7 +12,7 @@ from py import extract_lanl_genome
 from py import simulate_amplicon_dataset 
 from py import simulate_wgs_dataset 
 from py import covarying_sites
-from py import extract_5vm_truth
+from py import extract_truth
 
 from py import evaluate
 from py import write_abayesqr_config
@@ -25,6 +25,7 @@ from py import pluck_record
 from py import single_mapping_dataset
 from py import full_fvm_mapping_dataset
 from py import true_covarying_kmers
+from py import kmers_in_reads
 
 
 with open('simulations.json') as simulation_file:
@@ -206,29 +207,6 @@ rule simulate_wgs_dataset:
     fasta="output/wgs-simulation_{simulated_dataset}/truth.fasta"
   run:
     simulate_wgs_dataset(wildcards.simulated_dataset, output.fastq, output.fasta)
-
-rule wgs_simulation_true_sequences:
-  input:
-    wgs=rules.simulate_wgs_dataset.output.fasta,
-    reference="input/references/{reference}.fasta"
-  output:
-    sam="output/wgs-simulation_{simulated_dataset}/{reference}_truth.sam",
-    fasta="output/wgs-simulation_{simulated_dataset}/{reference}_truth.fasta"
-  conda:
-    "envs/veg.yml"
-  shell:
-    """
-      bealign -r {input.reference} {input.wgs} {output.sam}
-      bam2msa {output.sam} {output.fasta}
-    """
-
-rule wgs_simulation_true_covarying_sites:
-  input:
-    rules.wgs_simulation_true_sequences.output.fasta
-  output:
-    "output/wgs-simulation_{simulated_dataset}/{reference}_truth.json"
-  run:
-    covarying_sites(input[0], output[0])
 
 rule all_lanl_genes:
   input:
@@ -773,30 +751,53 @@ rule single_mapping_data:
   run:
     single_mapping_dataset(input.bam, input.reference, output[0])
 
-# Five Virus Mixture
+def true_sequences_input(wildcards):
+  if wildcards.dataset == 'FiveVirusMixIllumina_1':
+    return "input/5VM.fasta"
+  return "output/%s/truth.fasta" % wildcards.dataset
 
-rule FVM_true_sequences:
+rule true_sequences:
   input:
-    wgs="input/5VM.fasta",
-    reference="input/references/{reference}.fasta"
+    wgs=true_sequences_input,
+    reference=rules.situate_references.output[0]
   output:
-    fasta="output/FiveVirusMixIllumina_1/{reference}_truth.fasta"
+    fasta="output/{dataset}/{reference}_truth.fasta"
   run:
-    extract_5vm_truth(input.wgs, input.reference, output.fasta)
+    extract_truth(input.wgs, input.reference, wildcards.dataset, output.fasta)
 
-rule FVM_true_covarying:
+rule true_covarying_sites:
   input:
-    rules.FVM_true_sequences.output.fasta
+    rules.true_sequences.output.fasta
   output:
-    "output/FiveVirusMixIllumina_1/{reference}_truth.json"
+    "output/{dataset}/{reference}_truth.json"
   run:
     covarying_sites(input[0], output[0])
+
+rule covarying_kmers:
+  input:
+    fasta=rules.true_sequences.output.fasta,
+    json=rules.true_covarying_sites.output[0]
+  output:
+    "output/{dataset}/covarying_{reference}_{k}mers.csv"
+  run:
+    true_covarying_kmers(input.fasta, input.json, output[0], wildcards.k)
+
+rule read_kmer_support:
+  input:
+    bam=rules.sort_and_index.output.bam,
+    csv=rules.covarying_kmers.output[0]
+  output:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/{k}mer_support.csv"
+  run:
+    kmers_in_reads(input.bam, input.csv, output[0], wildcards.k)
+
+# Five Virus Mixture
 
 rule FVM_references:
   input:
     "input/5VM.fasta"
   output:
-    "output/FiveVirusMixIllumina_1/{strain}.fasta"
+    "output/FiveVirusMixIllumina_1/reference_genomes/{strain}.fasta"
   run:
     pluck_record(input[0], output[0], wildcards.strain)
  
@@ -810,15 +811,6 @@ rule all_fvm_mapping_data:
     "output/FiveVirusMixIllumina_1/{qc}/{read_mapper}/mapping_data.csv"
   run:
     full_fvm_mapping_dataset(input, output[0])
-
-rule covarying_kmers:
-  input:
-    fasta=rules.FVM_true_sequences.output.fasta,
-    json=rules.FVM_true_covarying.output[0]
-  output:
-    "output/FiveVirusMixIllumina_1/strain_{strain}_{k}mers.csv"
-  run:
-    true_covarying_kmers(input.fasta, input.json, output[0], wildcards.k)
 
 # Results
 

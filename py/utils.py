@@ -138,14 +138,16 @@ def add_subtype_information(input_csv, output_csv):
     df.to_csv(output_csv, index=False)
 
 
-def extract_5vm_truth(input_fasta, reference_path, output_path):
+def extract_truth(input_fasta, reference_path, dataset, output_path):
     sequences = list(SeqIO.parse(input_fasta, "fasta"))
     aligned_sequences = []
+    output_dir = os.path.join("output", dataset)
+    tmp_dir = os.path.join(output_dir, "truth-temp")
+    os.mkdir(tmp_dir)
     for sequence in sequences:
-        output_dir = os.path.join("output", "FiveVirusMixIllumina_1")
-        sequence_path = os.path.join(output_dir, sequence.id, "ref.fasta")
-        alignment_path = os.path.join(output_dir, sequence.id, "aligned.fasta")
-        SeqIO.write(sequence, alignment_path, "fasta")
+        sequence_path = os.path.join(tmp_dir, "ref.fasta")
+        alignment_path = os.path.join(tmp_dir, "aligned.fasta")
+        SeqIO.write(sequence, sequence_path, "fasta")
         command = [
             "water", "-asequence", sequence_path, "-bsequence",
             reference_path, "-gapopen", "10.0", "-gapextend", ".5", "-aformat",
@@ -155,6 +157,9 @@ def extract_5vm_truth(input_fasta, reference_path, output_path):
         aligned_sequence = list(SeqIO.parse(alignment_path, "fasta"))[0]
         aligned_sequence.seq = aligned_sequence.seq.ungap('-')
         aligned_sequences.append(aligned_sequence)
+        os.remove(sequence_path)
+        os.remove(alignment_path)
+    os.rmdir(tmp_dir)
     sequence_length = min([len(record.seq) for record in aligned_sequences])
     for record in aligned_sequences:
         record.seq = record.seq[:sequence_length]
@@ -301,3 +306,25 @@ def true_covarying_kmers(input_fasta, input_json, output_csv, k):
                 data['index_%d' % i].append(covarying_indices[i])
                 data['character_%d' % i].append(covarying_kmer[i])
     pd.DataFrame(data).to_csv(output_csv, index=False)
+
+
+def kmers_in_reads(input_bam, input_csv, output_csv, k):
+    k = int(k)
+    bam = pysam.AlignmentFile(input_bam)
+    df = pd.read_csv(input_csv)
+    df['support'] = np.zeros(len(df), dtype=np.int)
+    for read in bam.fetch():
+        starts_after = df.index_0 >= read.reference_start
+        ends_before = df['index_%d' % (k-1)] <= read.reference_end
+        relevent_kmers = df.loc[starts_after & ends_before, :]
+        for i, row in relevent_kmers.iterrows():
+            inds = list(row[['index_%d' % i for i in range(k)]])
+            vacs = ''.join([
+                read.query[pair[0]]
+                for pair in read.get_aligned_pairs(matches_only=True)
+                if pair[1] in inds
+            ])
+            kmer = ''.join(row[['character_%d' % i for i in range(k)]])
+            if vacs == kmer:
+                df.loc[i, 'support'] += 1
+    df.to_csv(output_csv)
