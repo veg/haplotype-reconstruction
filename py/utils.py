@@ -354,13 +354,18 @@ def result_json(distance_csv, output_json):
         json.dump(results, json_file, indent=2)
 
 
-def covarying_fasta(input_json, input_fasta, output_fasta):
+def covarying_fasta(input_json, input_fasta, output_fasta, end_correction=10):
     with open(input_json) as json_file:
         covarying_sites = json.load(json_file)
     records = list(SeqIO.parse(input_fasta, 'fasta'))
     for record in records:
+        last_site = len(record.seq) - end_correction
         record.seq = Seq(
-            ''.join([record.seq[i] for i in covarying_sites])
+            ''.join([
+                record.seq[i]
+                for i in covarying_sites
+                if i > end_correction and i < last_site
+            ])
         )
     SeqIO.write(records, output_fasta, 'fasta')
 
@@ -386,5 +391,56 @@ def report(input_files, output_csv, report_type):
             'gene': gene,
             'worst_distance': worst_distance,
             'report_type': report_type
+        })
+    csvfile.close()
+
+
+def superread_agreement(input_superreads, input_truth, output_csv):
+    superreads = list(SeqIO.parse(input_superreads, 'fasta'))
+    truth = list(SeqIO.parse(input_truth, 'fasta'))
+    csvfile = open(output_csv, 'w')
+    csvwriter = csv.DictWriter(
+        csvfile, fieldnames=[
+            'superread_id',
+            'weight',
+            'true_id',
+            'smallest_diff',
+            'smallest_recomb',
+            'start',
+            'stop'
+        ]
+    )
+    csvwriter.writeheader()
+    n_char = len(superreads[0].seq)
+    for superread in superreads:
+        smallest_diff = 1e6
+        superread_id, weight = superread.name.split('_')
+        weight = int(weight.split('-')[1])
+        superread_np = np.array(list(superread.seq), dtype='<U1')
+        start = (superread_np != '-').argmax()
+        stop = ((np.arange(n_char) >= start) & (superread_np == '-')).argmax()
+        smallest_recomb = 1e6
+        for true_sequence_a in truth:
+            true_a_np = np.array(list(true_sequence_a.seq), dtype='<U1')
+            diff = (superread_np[start:stop] != true_a_np[start:stop]).sum()
+            if diff < smallest_diff:
+                smallest_diff = diff
+                smallest_id = true_sequence_a.name
+            for true_sequence_b in truth:
+                true_b_np = np.array(list(true_sequence_b.seq), dtype='<U1')
+                for i in range(start, stop):
+                    first = true_a_np[start:i] != superread_np[start:i]
+                    second = true_b_np[i:stop] != superread_np[i:stop]
+                    recomb = first.sum() + second.sum()
+                    if recomb < smallest_recomb:
+                        smallest_recomb = recomb
+        csvwriter.writerow({
+            'superread_id': superread_id,
+            'weight': weight,
+            'true_id': smallest_id,
+            'smallest_diff': smallest_diff,
+            'smallest_recomb': smallest_recomb,
+            'start': start,
+            'stop': stop
         })
     csvfile.close()

@@ -29,6 +29,7 @@ from py import kmers_in_reads
 from py import result_json
 from py import covarying_fasta
 from py import report
+from py import superread_agreement
 
 
 with open('simulations.json') as simulation_file:
@@ -173,37 +174,6 @@ rule align_simulated:
       cat {input.target} {input.reference} > {output.unaligned}
       mafft --localpair {output.unaligned} > {output.aligned}
     """
-
-rule amplicon_simulation:
-  input:
-    rules.extract_gene.output.fasta
-  output:
-    "output/lanl/{lanl_id}/{gene}/reads.fastq"
-  params:
-    out="output/lanl/{lanl_id}/{gene}/reads"
-  conda:
-    "envs/ngs.yml"
-  shell:
-    """
-      art_illumina -rs 1 -ss HS25 -i {input} -l 120 -s 50 -c 150000 -o {params.out}
-      mv {params.out}.fq {output}
-    """
-
-def amplicon_simulation_inputs(wildcards):
-  dataset = SIMULATION_INFORMATION[wildcards.simulated_dataset]
-  lanl_ids = [info['lanl_id'] for info in dataset]
-  reads = ["output/lanl/%s/%s/reads.fastq" % (lanl_id, wildcards.gene) for lanl_id in lanl_ids]
-  genes = ["output/lanl/%s/%s/sequence.fasta" % (lanl_id, wildcards.gene) for lanl_id in lanl_ids]
-  return reads + genes
-
-rule simulate_amplicon_dataset:
-  input:
-    amplicon_simulation_inputs
-  output:
-    fastq=temp("output/amplicon_{gene}-simulation_{simulated_dataset}/amplicon.fastq"),
-    fasta="output/amplicon_{gene}-simulation_{simulated_dataset}/truth.fasta"
-  run:
-    simulate_amplicon_dataset(wildcards.simulated_dataset, wildcards.gene, output.fastq, output.fasta)
 
 rule wgs_simulation:
   input:
@@ -825,6 +795,15 @@ rule read_kmer_support:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/{k}mer_support.csv"
   run:
     kmers_in_reads(input.bam, input.csv, output[0], wildcards.k)
+
+rule superread_agreement:
+  input:
+    superreads=rules.superread.output.cvs,
+    truth=rules.true_covarying_fasta.output[0]
+  output:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/superread_agreement.csv"
+  run:
+    superread_agreement(input.superreads, input.truth, output[0])
 
 # Five Virus Mixture
 
