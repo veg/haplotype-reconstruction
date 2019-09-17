@@ -1,6 +1,7 @@
 import subprocess
 import json
 import os
+import csv
 
 import numpy as np
 import pandas as pd
@@ -138,11 +139,15 @@ def add_subtype_information(input_csv, output_csv):
     df.to_csv(output_csv, index=False)
 
 
-def extract_truth(input_fasta, reference_path, dataset, output_path):
+def extract_truth(
+        input_fasta, reference_path, dataset, reference, output_path
+        ):
     sequences = list(SeqIO.parse(input_fasta, "fasta"))
     aligned_sequences = []
     output_dir = os.path.join("output", dataset)
-    tmp_dir = os.path.join(output_dir, "truth-temp")
+    tmp_dir = os.path.join(
+        output_dir, "truth-%s-%s-temp" % (dataset, reference)
+    )
     os.mkdir(tmp_dir)
     for sequence in sequences:
         sequence_path = os.path.join(tmp_dir, "ref.fasta")
@@ -358,3 +363,28 @@ def covarying_fasta(input_json, input_fasta, output_fasta):
             ''.join([record.seq[i] for i in covarying_sites])
         )
     SeqIO.write(records, output_fasta, 'fasta')
+
+
+def report(input_files, output_csv, report_type):
+    csvfile = open(output_csv, 'w')
+    field_names = ['dataset', 'gene', 'worst_distance', 'report_type']
+    writer = csv.DictWriter(csvfile, field_names)
+    writer.writeheader()
+    for file_path in input_files:
+        with open(file_path) as json_file:
+            result_data = json.load(json_file)
+        dataset = file_path.split('/')[1]
+        gene = file_path.split('/')[4]
+        worst_distance = 0
+        for key, value in result_data.items():
+            if value['distance'] > worst_distance:
+                worst_distance = value['distance']
+        if report_type == 'reconstructing' and worst_distance > 5:
+            raise Exception('A reconstruction dataset failed!', dataset)
+        writer.writerow({
+            'dataset': dataset,
+            'gene': gene,
+            'worst_distance': worst_distance,
+            'report_type': report_type
+        })
+    csvfile.close()

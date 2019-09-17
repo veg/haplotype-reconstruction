@@ -28,6 +28,7 @@ from py import true_covarying_kmers
 from py import kmers_in_reads
 from py import result_json
 from py import covarying_fasta
+from py import report
 
 
 with open('simulations.json') as simulation_file:
@@ -79,6 +80,39 @@ rule all_haplotypers:
       dataset=ALL_DATASETS,
       reference=REFERENCE_SUBSET
     )
+
+rule all_acme_running:
+  input:
+    "output/FiveVirusMixIllumina_1/fastp/bowtie2/gag/acme/truth_and_haplotypes.json",
+    "output/FiveVirusMixIllumina_1/fastp/bowtie2/pol/acme/truth_and_haplotypes.json"
+  output:
+    "output/running_report.csv"
+  run:
+    report(input, output[0], 'running')
+
+rule all_acme_reconstructing:
+  input:
+    "output/wgs-simulation_diverged_joint/fastp/bowtie2/pol/acme/truth_and_haplotypes.json",
+    "output/wgs-simulation_diverged_joint_slightly_skewed/fastp/bowtie2/pol/acme/truth_and_haplotypes.json",
+    "output/wgs-simulation_diverged_joint_triplet/fastp/bowtie2/pol/acme/truth_and_haplotypes.json",
+    "output/wgs-simulation_diverged_joint_triplet_slightly_skewed/fastp/bowtie2/pol/acme/truth_and_haplotypes.json",
+    "output/wgs-simulation_diverged_five/fastp/bowtie2/pol/acme/truth_and_haplotypes.json"
+  output:
+    "output/reconstruction_report.csv"
+  run:
+    report(input, output[0], 'reconstructing')
+
+rule report:
+  input:
+    reconstructing=rules.all_acme_reconstructing.output[0],
+    running=rules.all_acme_running.output[0]
+  output:
+    "output/report.csv"
+  shell:
+    """
+      cat {input.reconstructing} > {output}
+      tail -n +2 {input.running} >> {output}
+    """
 
 rule all_bams:
   input:
@@ -740,7 +774,7 @@ rule true_sequences:
   output:
     fasta="output/{dataset}/{reference}_truth.fasta"
   run:
-    extract_truth(input.wgs, input.reference, wildcards.dataset, output.fasta)
+    extract_truth(input.wgs, input.reference, wildcards.dataset, wildcards.reference, output.fasta)
 
 rule true_covarying_sites:
   input:
