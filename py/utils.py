@@ -328,3 +328,33 @@ def kmers_in_reads(input_bam, input_csv, output_csv, k):
             if vacs == kmer:
                 df.loc[i, 'support'] += 1
     df.to_csv(output_csv)
+
+
+def result_json(distance_csv, output_json):
+    df = pd.read_csv(distance_csv)
+    not_quasispecies = df.first_record.apply(lambda x: x[:3] != 'qua')
+    desired_records = list(set(df.first_record[not_quasispecies]))
+    second_is_quasispecies = df.second_record.apply(lambda x: x[:3] == 'qua')
+    results = {}
+    for record in desired_records:
+        first_is_desired = df.first_record == record
+        best_match_index = df.loc[
+            first_is_desired & second_is_quasispecies, 'distance'
+        ].idxmin()
+        results[record] = {
+            'best_match': str(df.loc[best_match_index, 'second_record']),
+            'distance': int(df.loc[best_match_index, 'distance']),
+        }
+    with open(output_json, 'w') as json_file:
+        json.dump(results, json_file, indent=2)
+
+
+def covarying_fasta(input_json, input_fasta, output_fasta):
+    with open(input_json) as json_file:
+        covarying_sites = json.load(json_file)
+    records = list(SeqIO.parse(input_fasta, 'fasta'))
+    for record in records:
+        record.seq = Seq(
+            ''.join([record.seq[i] for i in covarying_sites])
+        )
+    SeqIO.write(records, output_fasta, 'fasta')

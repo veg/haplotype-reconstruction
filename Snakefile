@@ -26,6 +26,8 @@ from py import single_mapping_dataset
 from py import full_fvm_mapping_dataset
 from py import true_covarying_kmers
 from py import kmers_in_reads
+from py import result_json
+from py import covarying_fasta
 
 
 with open('simulations.json') as simulation_file:
@@ -85,14 +87,6 @@ rule all_bams:
       dataset=ALL_DATASETS,
       reference=REFERENCE_SUBSET,
       haplotyper=HAPLOTYPERS
-    )
-
-rule all_acme_ec:
-  input:
-    expand(
-      "output/{dataset}/fastp/bowtie2/{reference}/acme/corrected.bam",
-      dataset=ALL_DATASETS,
-      reference=REFERENCE_SUBSET
     )
 
 rule all_known_comparisons:
@@ -686,22 +680,14 @@ rule superread:
   run:
     read_graph_io(
       input.bam, input.json, input.consensus,
-      output.full, output.cvs, output.describing, output.graph, output.candidates
+      output.full, output.cvs, output.describing, output.graph, output.candidates,
+      minimum_weight=3
     )
 
 def reference_input(wildcards):
   format_string = "output/%s/%s_truth.fasta"
   parameters = (wildcards.dataset, wildcards.reference)
   return format_string % parameters
-
-rule truth_and_superreads:
-  input:
-    truth=reference_input,
-    superreads=rules.superread.output.full
-  output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/truth_and_superreads.fasta"
-  shell:
-    "cat {input.truth} {input.superreads} > {output}"
 
 rule truth_and_candidates:
   input:
@@ -764,6 +750,30 @@ rule true_covarying_sites:
   run:
     covarying_sites(input[0], output[0])
 
+rule true_covarying_fasta:
+  input:
+    json=rules.true_covarying_sites.output[0],
+    fasta=rules.true_sequences.output.fasta
+  output:
+    "output/{dataset}/{reference}_cvs_truth.fasta"
+  run:
+    covarying_fasta(input.json, input.fasta, output[0])
+
+rule truth_and_superreads:
+  input:
+    full_truth=reference_input,
+    cvs_truth=rules.true_covarying_fasta.output[0],
+    full_superreads=rules.superread.output.full,
+    cvs_superreads=rules.superread.output.cvs
+  output:
+    full="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/truth_and_full_superreads.fasta",
+    cvs="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/truth_and_cvs_superreads.fasta"
+  shell:
+    """
+      cat {input.full_truth} {input.full_superreads} > {output.full}
+      cat {input.cvs_truth} {input.cvs_superreads} > {output.cvs}
+    """
+
 rule covarying_kmers:
   input:
     fasta=rules.true_sequences.output.fasta,
@@ -820,11 +830,13 @@ rule haplotypes_and_truth:
   output:
     unaligned="output/{dataset}/{qc}/{read_mapper}/{reference}/{haplotyper}/truth_and_haplotypes_unaligned.fasta",
     aligned="output/{dataset}/{qc}/{read_mapper}/{reference}/{haplotyper}/truth_and_haplotypes.fasta",
-    csv="output/{dataset}/{qc}/{read_mapper}/{reference}/{haplotyper}/truth_and_haplotypes.csv"
+    csv="output/{dataset}/{qc}/{read_mapper}/{reference}/{haplotyper}/truth_and_haplotypes.csv",
+    json="output/{dataset}/{qc}/{read_mapper}/{reference}/{haplotyper}/truth_and_haplotypes.json"
   run:
     shell("cat {input.haplotypes} {input.truth} > {output.unaligned}")
     shell("mafft {output.unaligned} > {output.aligned}")
     pairwise_distance_csv(output.aligned, output.csv)
+    result_json(output.csv, output.json)
 
 rule haplotypes_and_truth_heatmap:
   input:
