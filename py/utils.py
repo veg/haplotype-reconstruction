@@ -395,6 +395,27 @@ def report(input_files, output_csv, report_type):
     csvfile.close()
 
 
+def haplotyper_report(input_files, output_csv):
+    csvfile = open(output_csv, 'w')
+    field_names = ['dataset', 'worst_distance']
+    writer = csv.DictWriter(csvfile, field_names)
+    writer.writeheader()
+    for file_path in input_files:
+        file_path = file_path.split('.')[0] + '.csv'
+        if not os.path.exists(file_path):
+            continue
+        with open(file_path) as json_file:
+            result_data = json.load(json_file)
+        for key, value in result_data.items():
+            if value['distance'] > worst_distance:
+                worst_distance = value['distance']
+        writer.writerow({
+            'dataset': file_path,
+            'worst_distance': worst_distance,
+        })
+    csvfile.close()
+
+
 def superread_agreement(input_superreads, input_truth, output_csv):
     superreads = list(SeqIO.parse(input_superreads, 'fasta'))
     truth = list(SeqIO.parse(input_truth, 'fasta'))

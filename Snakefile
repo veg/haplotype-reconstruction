@@ -30,6 +30,7 @@ from py import result_json
 from py import covarying_fasta
 from py import report
 from py import superread_agreement
+from py import haplotyper_report
 
 
 with open('simulations.json') as simulation_file:
@@ -114,6 +115,18 @@ rule report:
       cat {input.reconstructing} > {output}
       tail -n +2 {input.running} >> {output}
     """
+
+rule haplotyper_truth_report:
+  input:
+    expand(
+      "output/{dataset}/{{qc}}/{{read_mapper}}/{reference}/{{haplotyper}}/truth_and_haplotypes.png",
+      dataset=KNOWN_TRUTH,
+      reference=REFERENCE_SUBSET
+    )
+  output:
+    "output/reports/{haplotyper}-{qc}-{read_mapper}.csv"
+  run:
+    haplotyper_report(input, output[0])
 
 rule all_bams:
   input:
