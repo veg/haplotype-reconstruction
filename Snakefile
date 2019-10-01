@@ -35,8 +35,6 @@ from py import haplotyper_report
 
 with open('simulations.json') as simulation_file:
   SIMULATION_INFORMATION = json.load(simulation_file)
-with open('compartmentalization.json') as simulation_file:
-  COMPARTMENT_INFORMATION = json.load(simulation_file)
 ACCESSION_NUMBERS = ['ERS6610%d' % i for i in range(87, 94)]
 SIMULATED_DATASETS = ['sim-' + dataset for dataset in SIMULATION_INFORMATION.keys()]
 RECONSTRUCTION_DATASETS = [

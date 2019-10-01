@@ -31,7 +31,7 @@ where the variables can take one of the following values:
 ### Dataset
 For more information, see the Data section below.
 
-- <b>LANL simulations</b>: see keys of `simulations.json` for potential simulation names. Either `amplicon-$GENE_simulation_$SIMULATIONNAME` with a particular HXB2 reference, or `wgs-simulation_$SIMULATIONNAME`.
+- <b>LANL simulations</b>: see keys of `simulations.json` for potential simulation names
 - <b>Reconstruction</b>: see filenames in `reconstruction` directory of input data
 - <b>Evolution</b>: see filenames in `evolution` directory of input data
 - <b>Compartmentalization</b>: see entries in `compartmentalization.json` in root directory
