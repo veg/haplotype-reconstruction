@@ -735,11 +735,12 @@ rule read_kmer_support:
 rule superread_agreement:
   input:
     superreads=rules.superread.output.full,
-    truth=rules.true_covarying_fasta.output[0]
+    fasta=rules.true_covarying_fasta.output[0],
+    json=rules.true_covarying_sites.output[0]
   output:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/superread_agreement.csv"
   run:
-    superread_agreement(input.superreads, input.truth, output[0])
+    superread_agreement(input.superreads, input.fasta, input.json, output[0])
 
 rule haplotypes_and_truth:
   input:

@@ -416,9 +416,11 @@ def haplotyper_report(input_files, output_csv):
     csvfile.close()
 
 
-def superread_agreement(input_superreads, input_truth, output_csv):
+def superread_agreement(input_superreads, input_fasta, input_json, output_csv):
     superreads = list(SeqIO.parse(input_superreads, 'fasta'))
-    truth = list(SeqIO.parse(input_truth, 'fasta'))
+    truth = list(SeqIO.parse(input_fasta, 'fasta'))
+    with open(input_json) as json_file:
+        sites = np.array(json.load(json_file), dtype=np.int)
     csvfile = open(output_csv, 'w')
     csvwriter = csv.DictWriter(
         csvfile, fieldnames=[
@@ -432,12 +434,12 @@ def superread_agreement(input_superreads, input_truth, output_csv):
         ]
     )
     csvwriter.writeheader()
-    n_char = len(superreads[0].seq)
+    n_char = len(sites)
     for superread in superreads:
         smallest_diff = 1e6
         superread_id, weight = superread.name.split('_')
         weight = int(weight.split('-')[1])
-        superread_np = np.array(list(superread.seq), dtype='<U1')
+        superread_np = np.array(list(superread.seq), dtype='<U1')[sites]
         start = (superread_np != '-').argmax()
         stop = ((np.arange(n_char) >= start) & (superread_np == '-')).argmax()
         smallest_recomb = 1e6
