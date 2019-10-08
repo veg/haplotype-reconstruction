@@ -2,7 +2,6 @@ import os
 import json
 
 import pysam
-
 from convex_qsr import error_correction_io
 from convex_qsr import read_graph_io
 from convex_qsr import regression_io
@@ -11,9 +10,9 @@ from convex_qsr import ErrorCorrection
 from py import extract_lanl_genome
 from py import simulate_amplicon_dataset 
 from py import simulate_wgs_dataset 
+from py import simulation_truth
 from py import covarying_sites
 from py import extract_truth
-
 from py import evaluate
 from py import write_abayesqr_config
 from py import parse_abayesqr_output
@@ -177,7 +176,8 @@ rule simulation:
   input:
     rules.extract_lanl_genome.output[0]
   output:
-    "output/lanl/{lanl_id}/wgs.fastq"
+    fastq="output/lanl/{lanl_id}/wgs.fastq",
+    sam="output/lanl/{lanl_id}/wgs.sam"
   params:
     out="output/lanl/{lanl_id}/wgs"
   conda:
@@ -185,8 +185,22 @@ rule simulation:
   shell:
     """
       art_illumina -rs 1 -ss HS25 --samout -i {input} -l 120 -s 50 -c 150000 -o {params.out}
-      mv {params.out}.fq {output}
+      mv {params.out}.fq {output.fastq}
     """
+
+rule simulation_truth:
+  output:
+    "output/sim-{simulated_dataset}_ar-{ar}/truth.fasta"
+  run:
+    simulation_truth(wildcards.simulated_dataset, output[0])
+
+rule simulation_truth_aligned:
+  input:
+    rules.simulation_truth.output[0],
+  output:
+    "output/sim-{simulated_dataset}_ar-{ar}/truth-aligned.fasta"
+  shell:
+    "mafft {input} > {output}"
 
 def wgs_simulation_inputs(wildcards):
   dataset = SIMULATION_INFORMATION[wildcards.simulated_dataset]
@@ -197,12 +211,15 @@ def wgs_simulation_inputs(wildcards):
 
 rule simulate_wgs_dataset:
   input:
-    wgs_simulation_inputs
+    wgs_simulation_inputs,
+    fasta=rules.simulation_truth_aligned.output[0]
   output:
-    fastq=temp("output/sim-{simulated_dataset}/wgs.fastq"),
-    fasta="output/sim-{simulated_dataset}/truth.fasta"
+    fastq=temp("output/sim-{simulated_dataset}_ar-{ar}/wgs.fastq"),
+    json="output/sim-{simulated_dataset}_ar-{ar}/simulation_quality.json"
   run:
-    simulate_wgs_dataset(wildcards.simulated_dataset, output.fastq, output.fasta)
+    simulate_wgs_dataset(
+      wildcards.simulated_dataset, wildcards.ar, input.fasta, output.fastq, output.json
+    )
 
 # Situating other data
 
