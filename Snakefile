@@ -696,9 +696,10 @@ rule true_sequences:
     wgs=true_sequences_input,
     reference=rules.situate_references.output[0]
   output:
-    fasta="output/{dataset}/{reference}_truth.fasta"
+    fasta="output/{dataset}/{reference}_truth.fasta",
+    json="output/{dataset}/{reference}_truth.json"
   run:
-    extract_truth(input.wgs, input.reference, wildcards.dataset, wildcards.reference, output.fasta)
+    extract_truth(input.wgs, input.reference, wildcards.dataset, wildcards.reference, output.fasta, output.json)
 
 rule true_covarying_sites:
   input:

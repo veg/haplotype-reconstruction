@@ -140,7 +140,8 @@ def add_subtype_information(input_csv, output_csv):
 
 
 def extract_truth(
-        input_fasta, reference_path, dataset, reference, output_path
+        input_fasta, reference_path, dataset, reference, output_path,
+        output_json_path
         ):
     sequences = list(SeqIO.parse(input_fasta, "fasta"))
     aligned_sequences = []
@@ -170,6 +171,21 @@ def extract_truth(
         record.seq = record.seq[:sequence_length]
     SeqIO.write(aligned_sequences, output_path, "fasta")
 
+    pairwise_distances = []
+    for i in range(len(aligned_sequences)):
+        first_sequence = aligned_sequences[i]
+        first_np = np.array(list(first_sequence.seq), dtype='<U1')
+        for j in range(i+1, len(aligned_sequences)):
+            second_sequence = aligned_sequences[j]
+            second_np = np.array(list(second_sequence.seq), dtype='<U1')
+            disagreement = int((first_np != second_np).sum())
+            pairwise_distances.append({
+                'sequenceA': first_sequence.name,
+                'sequenceB': second_sequence.name,
+                'disagreement': disagreement
+            })
+    with open(output_json_path, 'w') as json_file:
+        json.dump(pairwise_distances, json_file, indent=2)
 
 def covarying_truth(
         input_computed, input_actual, input_reference, output_json
