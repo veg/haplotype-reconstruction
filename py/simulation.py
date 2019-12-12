@@ -113,7 +113,7 @@ def get_alignment_to_reference_map(lanl_id, aligned_genomes):
 
 def get_mate(
         read, left_strain, right_strain, sams, sam_infos,
-        r2a_maps, a2r_maps, stop=100
+        r2a_maps, a2r_maps, stop=25
         ):
     sam = sams[right_strain]
     sam_info = sam_infos[right_strain]
@@ -142,26 +142,28 @@ def get_mate(
                     return sam_info[location][i]
         i += 1
         if i == stop:
-            raise ValueError('No suitable mate found!')
+            return None
 
 
-def write_ar_dataset(lanl_ids, frequencies, ar, aligned_genomes, output_fastq):
+def write_ar_dataset(
+        lanl_ids, frequencies, ar, aligned_genomes, output_fastq,
+        number_of_reads
+        ):
     sams = [
         list(pysam.AlignmentFile('output/lanl/%s/wgs.sam' % lanl_id, "r"))
         for lanl_id in lanl_ids
     ]
     sam_infos = [get_sam_info(sam) for sam in sams]
-    number_of_reads = len(sams[0])
     number_of_ar_reads = np.ceil(ar*number_of_reads).astype(np.int)
     number_of_clean_reads = number_of_reads - number_of_ar_reads
     number_of_strains = len(frequencies)
     ar_left_strains = np.random.choice(
-        number_of_strains, number_of_ar_reads, p=frequencies
+        number_of_strains, 2*number_of_ar_reads, p=frequencies
     )
     ar_left_indices = np.random.choice(
-        number_of_clean_reads, number_of_ar_reads, replace=False
+        number_of_clean_reads, 2*number_of_ar_reads, replace=False
     )
-    ar_right_strains = np.zeros(number_of_ar_reads, dtype=np.int)
+    ar_right_strains = np.zeros(2*number_of_ar_reads, dtype=np.int)
     for i in range(number_of_strains):
         other_strains = [j for j in range(number_of_strains) if j != i]
         new_frequencies = np.array([frequencies[j] for j in other_strains])
@@ -183,15 +185,21 @@ def write_ar_dataset(lanl_ids, frequencies, ar, aligned_genomes, output_fastq):
         for lanl_id in lanl_ids
     ]
     with open(output_fastq, 'w') as output_file:
-        for i in range(number_of_ar_reads):
-            left_strain = ar_left_strains[i]
-            left_read_index = ar_left_indices[i]
-            left_read = sams[left_strain][left_read_index]
-            right_strain = ar_right_strains[i]
-            right_read_index = get_mate(
-                left_read, left_strain, right_strain, sams, sam_infos,
-                reference_to_alignment_maps, alignment_to_reference_maps
-            )
+        i = 0
+        for _ in range(number_of_ar_reads):
+            found = False
+            while not found:
+                left_strain = ar_left_strains[i]
+                left_read_index = ar_left_indices[i]
+                left_read = sams[left_strain][left_read_index]
+                right_strain = ar_right_strains[i]
+                right_read_index = get_mate(
+                    left_read, left_strain, right_strain, sams, sam_infos,
+                    reference_to_alignment_maps, alignment_to_reference_maps
+                )
+                i += 1
+                if right_read_index is not None:
+                    found = True
             right_read = sams[right_strain][right_read_index]
 
             left_aligned_pairs = left_read.get_aligned_pairs(matches_only=True)
@@ -268,9 +276,10 @@ def simulation_truth(dataset, output_fasta):
 
 
 def simulate_wgs_dataset(
-        dataset, ar, input_fasta, output_fastq, output_json, seed=1
+        dataset, ar, input_fasta, output_fastq, output_json,
+        seed=1, number_of_reads=50000
         ):
-    np.random.seed(seed)
+    np.random.seed(int(seed))
     ar = float(ar)/100
     with open('simulations.json') as json_file:
         simulation_information = json.load(json_file)[dataset]
@@ -281,7 +290,10 @@ def simulate_wgs_dataset(
     aligned_genomes = SeqIO.to_dict(
         SeqIO.parse(input_fasta, 'fasta')
     )
-    write_ar_dataset(lanl_ids, frequencies, ar, aligned_genomes, output_fastq)
+    write_ar_dataset(
+        lanl_ids, frequencies, ar, aligned_genomes, output_fastq,
+        number_of_reads
+        )
 
     with open(output_json, 'w') as json_file:
         json.dump(

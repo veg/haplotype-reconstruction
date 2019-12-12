@@ -73,12 +73,22 @@
   ],
   "relatedPair": [
     {
-      "lanl_id": "B.KR.2005.05CSR3.DQ837381",
+      "lanl_id": "B.US.2012.505_0997a.WG06.MG196881",
       "frequency": 0.5
     },
     {
       "lanl_id": "B.US.2012.505_0122a.WG08.MG196700",
       "frequency": 0.5
+    }
+  ],
+  "relatedPairSlightlySkewed": [
+    {
+      "lanl_id": "B.US.2012.505_0997a.WG06.MG196881",
+      "frequency": 0.8
+    },
+    {
+      "lanl_id": "B.US.2012.505_0122a.WG08.MG196700",
+      "frequency": 0.2
     }
   ],
   "divergedFive": [

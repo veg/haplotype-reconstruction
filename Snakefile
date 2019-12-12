@@ -184,7 +184,7 @@ rule simulation:
     "envs/ngs.yml"
   shell:
     """
-      art_illumina -rs 1 -ss HS25 --samout -i {input} -l 120 -s 50 -c 150000 -o {params.out}
+      art_illumina -rs 1 -ss HS25 --samout -i {input} -l 120 -s 50 -c 1500000 -o {params.out}
       mv {params.out}.fq {output.fastq}
     """
 
@@ -214,11 +214,11 @@ rule simulate_wgs_dataset:
     wgs_simulation_inputs,
     fasta=rules.simulation_truth_aligned.output[0]
   output:
-    fastq=temp("output/sim-{simulated_dataset}_ar-{ar}/wgs.fastq"),
-    json="output/sim-{simulated_dataset}_ar-{ar}/simulation_quality.json"
+    fastq=temp("output/sim-{simulated_dataset}_ar-{ar}_seed-{seed}/wgs.fastq"),
+    json="output/sim-{simulated_dataset}_ar-{ar}_seed-{seed}/simulation_quality.json"
   run:
     simulate_wgs_dataset(
-      wildcards.simulated_dataset, wildcards.ar, input.fasta, output.fastq, output.json
+      wildcards.simulated_dataset, wildcards.ar, input.fasta, output.fastq, output.json, wildcards.seed
     )
 
 # Situating other data
