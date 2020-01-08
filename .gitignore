@@ -22,3 +22,4 @@ compartmentalization.json
 .ipynb_checkpoints
 *.jar
 tags*
+.tern-port
