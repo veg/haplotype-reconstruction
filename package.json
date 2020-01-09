@@ -22,6 +22,7 @@
   "dependencies": {
     "alignment.js": "^0.1.1",
     "axios": "^0.19.1",
+    "body-parser": "^1.19.0",
     "bootstrap": "^4.4.1",
     "bootswatch": "^4.4.1",
     "d3": "^5.15.0",
