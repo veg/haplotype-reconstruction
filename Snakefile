@@ -31,6 +31,7 @@ from py import report
 from py import superread_agreement
 from py import haplotyper_report
 from py import sc_covarying_sites_io
+from py import sc_superread_io
 
 
 with open('simulations.json') as simulation_file:
@@ -655,14 +656,23 @@ rule regression:
   run:
     regression_io(input.superreads, input.describing, input.candidates_fasta, output[0])
 
-
 rule sc_covarying_sites:
   input:
     rules.sort_and_index.output.bam
   output:
-    json="output/{dataset}/{qc}/{read_mapper}/{reference}/sc/covarying_sites.json",
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/sc/covarying_sites.json",
   run:
-    sc_covarying_sites_io(input[0], output.json)
+    sc_covarying_sites_io(input[0], output[0])
+
+rule sc_superreads:
+  input:
+    alignment=rules.sort_and_index.output.bam,
+    covarying_sites=rules.sc_covarying_sites.output[0]
+  output:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/sc/superreads.json",
+  run:
+    sc_superread_io(input.alignment, input.covarying_sites, output[0])
+    
 
 # Five Virus Mixture
 

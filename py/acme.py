@@ -128,7 +128,7 @@ def admission(minimum_weight):
     return comparator
 
 
-def obtain_superreads(alignment, min_cv_start, max_cv_end, minimum_weight=3):
+def obtain_superreads(alignment, covarying_sites, minimum_weight=3):
     read_information = read_reference_start_and_end(
         alignment, covarying_sites
     )
@@ -174,22 +174,19 @@ def obtain_superreads(alignment, min_cv_start, max_cv_end, minimum_weight=3):
             superread[1][0] for superread in admissible_superreads
         ])
         for vacs, weight in admissible_superreads:
-            cv_start = int(covarying_boundaries[0])
-            cv_end = int(covarying_boundaries[1])
-            if cv_start >= min_cv_start and cv_end <= max_cv_end:
-                all_superreads.append({
-                    'index': superread_index,
-                    'vacs': vacs,
-                    'weight': weight[0],
-                    'frequency': weight[0]/total_weight,
-                    'ar': weight[1],
-                    'ar_frequency': weight[1]/weight[0],
-                    'cv_start': cv_start,
-                    'cv_end': cv_end,
-                    'composition': weight[2],
-                    'discarded': False
-                })
-                superread_index += 1
+            all_superreads.append({
+                'index': superread_index,
+                'vacs': vacs,
+                'weight': weight[0],
+                'frequency': weight[0]/total_weight,
+                'ar': weight[1],
+                'ar_frequency': weight[1]/weight[0],
+                'cv_start': int(covarying_boundaries[0]),
+                'cv_end': int(covarying_boundaries[1]),
+                'composition': weight[2],
+                'discarded': False
+            })
+            superread_index += 1
     return all_superreads
 
 
@@ -246,3 +243,13 @@ def sc_covarying_sites_io(bam_path, json_path):
     covarying_sites_json = [int(site) for site in covarying_sites]
     with open(json_path, 'w') as json_file:
         json.dump(covarying_sites_json, json_file)
+
+
+def sc_superread_io(bam_path, covarying_path, superread_path):
+    with open(covarying_path) as json_file:
+        covarying_sites = np.array(json.load(json_file), dtype=np.int)
+    alignment = pysam.AlignmentFile(bam_path, 'rb')
+
+    superreads = obtain_superreads(alignment, covarying_sites)
+    with open(superread_path, 'w') as json_file:
+        json.dump(superreads, json_file, indent=2)
