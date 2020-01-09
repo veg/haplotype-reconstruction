@@ -32,6 +32,7 @@ from py import superread_agreement
 from py import haplotyper_report
 from py import sc_covarying_sites_io
 from py import sc_superread_io
+from py import sc_embedding_io
 
 
 with open('simulations.json') as simulation_file:
@@ -672,7 +673,14 @@ rule sc_superreads:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/sc/superreads.json",
   run:
     sc_superread_io(input.alignment, input.covarying_sites, output[0])
-    
+
+rule sc_embedding:
+  input:
+    rules.sc_superreads.output[0]
+  output:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/sc/embedding_{start}_{stop}.csv"
+  run:
+    sc_embedding_io(input[0], output[0], wildcards.start, wildcards.stop)
 
 # Five Virus Mixture
 

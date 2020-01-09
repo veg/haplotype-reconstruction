@@ -190,8 +190,16 @@ def obtain_superreads(alignment, covarying_sites, minimum_weight=3):
     return all_superreads
 
 
-def get_score_matrix(alignment, min_cv_start, max_cv_end):
-    superreads = obtain_superreads(aln, min_cv_start, max_cv_end)
+def superread_cv_filter(superreads, min_cv_start, max_cv_end):
+    def cv_filter(sr):
+        starts_after = sr['cv_start'] >= min_cv_start
+        ends_before = sr['cv_end'] < max_cv_end
+        return starts_after and ends_before
+    return list(filter(cv_filter, superreads))
+
+
+def get_score_matrix(superreads, min_cv_start, max_cv_end,
+        minimum_agreement=0, power=1):
     n_sr = len(superreads)
     scores = []
     rows = []
@@ -224,8 +232,8 @@ def get_score_matrix(alignment, min_cv_start, max_cv_end):
     return scipy.sparse.csr_matrix((scores, (rows, cols)), shape=(n_sr, n_sr))
 
 
-def perform_spectral_embedding(alignment, min_cv_start, max_cv_end):
-    X = get_score_matrix(alignment, min_cv_start, max_cv_end)
+def perform_spectral_embedding(superreads, min_cv_start, max_cv_end):
+    X = get_score_matrix(superreads, min_cv_start, max_cv_end)
     return SpectralEmbedding(
         n_components=2,
         random_state=0,
@@ -234,7 +242,7 @@ def perform_spectral_embedding(alignment, min_cv_start, max_cv_end):
 
 
 def get_labels(superreads):
-    labels = [max(sr['composition'].items(), key=lambda x: x[1])[0] for sr in superreads]
+    return [max(sr['composition'].items(), key=lambda x: x[1])[0] for sr in superreads]
 
 
 def sc_covarying_sites_io(bam_path, json_path):
@@ -253,3 +261,21 @@ def sc_superread_io(bam_path, covarying_path, superread_path):
     superreads = obtain_superreads(alignment, covarying_sites)
     with open(superread_path, 'w') as json_file:
         json.dump(superreads, json_file, indent=2)
+
+
+def sc_embedding_io(superread_path, embedding_path, min_cv_start, max_cv_end):
+    min_cv_start = int(min_cv_start)
+    max_cv_end = int(max_cv_end)
+    with open(superread_path) as json_file:
+        superreads = superread_cv_filter(
+            json.load(json_file),
+            min_cv_start,
+            max_cv_end
+        )
+    embedding = perform_spectral_embedding(superreads, min_cv_start, max_cv_end)
+    df = pd.DataFrame({
+        'x': embedding[:, 0],
+        'y': embedding[:, 1],
+        'label': get_labels(superreads)
+    })
+    df.to_csv(embedding_path)
