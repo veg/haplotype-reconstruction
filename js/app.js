@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import ReactDOM from "react-dom";
-import { BrowserRouter, Route, Link, Switch, useRouteMatch } from "react-router-dom";
+import { BrowserRouter, Route, Link, Switch } from "react-router-dom";
 import Nav from "react-bootstrap/Nav";
 import Navbar from "react-bootstrap/Navbar";
 import Container from "react-bootstrap/Container";
@@ -8,6 +8,8 @@ import Row from "react-bootstrap/Row";
 import Col from "react-bootstrap/Col";
 import Breadcrumb from "react-bootstrap/Breadcrumb";
 import axios from "axios";
+
+import Visualization from "./visualization";
 
 import "./styles.scss";
 
@@ -78,26 +80,17 @@ function Home() {
   </Container>);
 }
 
-function Visualization() {
-  return (<Container>
-    <Row>
-      <Col>
-        <h2>Visualization</h2>
-      </Col>
-    </Row>
-  </Container>);
-}
 
 function App() {
   return (<BrowserRouter>
     <Navbar bg="dark" variant="dark">
       <Link className="navbar-brand" to="/">ACME Haplotype Reconstruction</Link>
       <Nav className="mr-auto">
-        <Link className="nav-link" to="/visualiztion">Visualization</Link>
+        <Link className="nav-link" to="/visualization">Visualization</Link>
       </Nav>
     </Navbar>
     <Switch>
-      <Route path="/visualiztion">
+      <Route path="/visualization">
         <Visualization />
       </Route>
       <Route path="/">
