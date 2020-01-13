@@ -279,3 +279,25 @@ def sc_embedding_io(superread_path, embedding_path, min_cv_start, max_cv_end):
         'label': get_labels(superreads)
     })
     df.to_csv(embedding_path)
+
+
+def sc_srfasta_io(input_cvs, input_srdata, output_fasta):
+    with open(input_cvs) as json_file:
+        cvs = json.load(json_file)
+    with open(input_srdata) as json_file:
+        srdata = json.load(json_file)
+    outfile = open(output_fasta, 'w')
+    n_cvs = len(cvs)
+    for sr in srdata:
+        outfile.write('>superread-%d\n' % sr['index'])
+        seq = sr['cv_start']*'-' + sr['vacs'] + (n_cvs - sr['cv_end'])*'-'
+        outfile.write(seq + '\n')
+    outfile.close()
+
+
+def sc_truthcvs_io():
+    truth = list(SeqIO.parse(input_fasta))
+    for record in truth:
+        record.seq = ''.join([record.seq[i] for i in cvs])
+    SeqIO.write(truth, output_sr, 'fasta')
+    SeqIO.write(truth, output_truth, 'fasta')

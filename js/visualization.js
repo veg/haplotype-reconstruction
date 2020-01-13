@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import Alignment from "alignment.js";
 import { Route, Link, Switch, useRouteMatch, useParams } from "react-router-dom";
 import Container from "react-bootstrap/Container";
 import Row from "react-bootstrap/Row";
@@ -8,7 +9,16 @@ import axios from "axios";
 
 function Dataset() {
   const { dataset } = useParams();
-  return <h1>{dataset}</h1>;
+  const [fasta, setFasta] = useState();
+  useEffect(() => {
+    axios.get(`/api/static/${dataset}/fastp/bowtie2/pol/sc/superreads-cvs.fasta`)
+      .then(response => setFasta(response.data))
+      .catch(error => console.log(error));
+  });
+  return (<div>
+    <h4>{dataset}</h4>
+    <Alignment fasta={fasta} />
+  </div>);
 }
 
 function DatasetLink(props) {
@@ -23,9 +33,10 @@ function AllDatasets() {
   useEffect(() => {
     axios.post('/api/files', { path: "/" })
       .then(response => {
+        const discards = ['lanl', 'references', 'truth'];
         setDatasets(response.data.files.map(dataset => dataset.name)
           .filter(dataset => {
-            return dataset != 'lanl' && dataset != 'references'
+            return discards.indexOf(dataset) == -1;
           }));
       }).catch(error => {
         console.log(error);

@@ -7,32 +7,7 @@ from convex_qsr import read_graph_io
 from convex_qsr import regression_io
 from convex_qsr import ErrorCorrection
 
-from py import extract_lanl_genome
-from py import simulate_amplicon_dataset 
-from py import simulate_wgs_dataset 
-from py import simulation_truth
-from py import covarying_sites
-from py import extract_truth
-from py import evaluate
-from py import write_abayesqr_config
-from py import parse_abayesqr_output
-from py import pairwise_distance_csv
-from py import add_subtype_information
-from py import covarying_truth
-from py import downsample_bam
-from py import pluck_record
-from py import single_mapping_dataset
-from py import full_fvm_mapping_dataset
-from py import true_covarying_kmers
-from py import kmers_in_reads
-from py import result_json
-from py import covarying_fasta
-from py import report
-from py import superread_agreement
-from py import haplotyper_report
-from py import sc_covarying_sites_io
-from py import sc_superread_io
-from py import sc_embedding_io
+from py import *
 
 
 with open('simulations.json') as simulation_file:
@@ -191,9 +166,17 @@ rule simulation:
       mv {params.out}.fq {output.fastq}
     """
 
+def simulation_truth_input(wildcards):
+  dataset = SIMULATION_INFORMATION[wildcards.simulated_dataset]
+  lanl_ids = [info['lanl_id'] for info in dataset]
+  genomes = ["output/lanl/%s/genome.fasta" % (lanl_id) for lanl_id in lanl_ids]
+  return genomes
+
 rule simulation_truth:
+  input:
+    simulation_truth_input
   output:
-    "output/sim-{simulated_dataset}_ar-{ar}/truth.fasta"
+    "output/truth/sim-{simulated_dataset}/truth.fasta"
   run:
     simulation_truth(wildcards.simulated_dataset, output[0])
 
@@ -201,7 +184,7 @@ rule simulation_truth_aligned:
   input:
     rules.simulation_truth.output[0],
   output:
-    "output/sim-{simulated_dataset}_ar-{ar}/truth-aligned.fasta"
+    "output/truth/sim-{simulated_dataset}/aligned.fasta"
   shell:
     "mafft {input} > {output}"
 
@@ -673,6 +656,15 @@ rule sc_superreads:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/sc/superreads.json",
   run:
     sc_superread_io(input.alignment, input.covarying_sites, output[0])
+
+rule sc_superread_fasta:
+  input:
+    cvs=rules.sc_covarying_sites.output[0],
+    sr=rules.sc_superreads.output[0]
+  output:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/sc/superreads-cvs.fasta"
+  run:
+    sc_srfasta_io(input.cvs, input.sr, output[0])
 
 rule sc_embedding:
   input:
