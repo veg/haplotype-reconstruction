@@ -3,6 +3,8 @@ import json
 
 import pysam
 from convex_qsr import covarying_sites_io
+from convex_qsr import superread_json_io
+from convex_qsr import superread_fasta_io
 
 from py import *
 
@@ -561,22 +563,25 @@ rule covarying_sites:
   run:
     covarying_sites_io(input[0], output[0])
 
-'''
-rule error_correction:
+rule superreads:
   input:
-    rules.sort_and_index.output.bam
+    alignment=rules.sort_and_index.output.bam,
+    covarying_sites=rules.covarying_sites.output[0]
   output:
-    bam="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/corrected.bam",
-    index="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/corrected.bam.bai",
-    json="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/covarying_sites.json",
-    consensus="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/consensus.fasta",
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/superreads.json",
   run:
-    error_correction_io(
-      input[0], output.bam, True,
-      output.json, output.consensus,
-      end_correction=10
-    )
+    superread_json_io(input.alignment, input.covarying_sites, output[0])
 
+rule sc_superread_fasta:
+  input:
+    cvs=rules.covarying_sites.output[0],
+    sr=rules.superreads.output[0]
+  output:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/superreads.fasta"
+  run:
+    superread_fasta_io(input.cvs, input.sr, output[0])
+
+'''
 rule covarying_truth:
   input:
     computed=rules.error_correction.output.json,
