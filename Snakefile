@@ -176,7 +176,7 @@ rule simulation_truth:
   input:
     simulation_truth_input
   output:
-    "output/truth/sim-{simulated_dataset}/truth.fasta"
+    "output/truth/sim-{simulated_dataset}/genomes.fasta"
   run:
     simulation_truth(wildcards.simulated_dataset, output[0])
 
@@ -709,15 +709,16 @@ rule single_mapping_data:
 def true_sequences_input(wildcards):
   if wildcards.dataset == 'FiveVirusMixIllumina_1':
     return "input/5VM.fasta"
-  return "output/%s/truth.fasta" % wildcards.dataset
+  dataset = wildcards.dataset.split('_')[0]
+  return "output/truth/%s/genomes.fasta" % dataset
 
 rule true_sequences:
   input:
     wgs=true_sequences_input,
     reference=rules.situate_references.output[0]
   output:
-    fasta="output/{dataset}/{reference}_truth.fasta",
-    json="output/{dataset}/{reference}_truth.json"
+    fasta="output/truth/{dataset}/{reference}_gene.fasta",
+    json="output/truth/{dataset}/{reference}_gene.json"
   run:
     extract_truth(input.wgs, input.reference, wildcards.dataset, wildcards.reference, output.fasta, output.json)
 
@@ -725,9 +726,18 @@ rule true_covarying_sites:
   input:
     rules.true_sequences.output.fasta
   output:
-    "output/{dataset}/{reference}_truth.json"
+    "output/truth/{dataset}/{reference}_covarying_sites.json"
   run:
     covarying_sites(input[0], output[0])
+
+rule sorted_and_truth:
+  input:
+    reads=rules.sorted_fasta.output[0],
+    truth=rules.true_sequences.output.fasta
+  output:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/truth_and_sorted.fasta"
+  shell:
+    "cat {input.truth} {input.reads} > {output}"
 
 rule true_covarying_fasta:
   input:

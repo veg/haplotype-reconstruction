@@ -145,7 +145,7 @@ def extract_truth(
         ):
     sequences = list(SeqIO.parse(input_fasta, "fasta"))
     aligned_sequences = []
-    output_dir = os.path.join("output", dataset)
+    output_dir = os.path.join("output", "truth", dataset)
     tmp_dir = os.path.join(
         output_dir, "truth-%s-%s-temp" % (dataset, reference)
     )
