@@ -2,10 +2,7 @@ import os
 import json
 
 import pysam
-from convex_qsr import error_correction_io
-from convex_qsr import read_graph_io
-from convex_qsr import regression_io
-from convex_qsr import ErrorCorrection
+from convex_qsr import covarying_sites_io
 
 from py import *
 
@@ -556,6 +553,15 @@ rule readreduce:
 
 # ACME haplotype reconstruction
 
+rule covarying_sites:
+  input:
+    rules.sort_and_index.output.bam
+  output:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/covarying_sites.json"
+  run:
+    covarying_sites_io(input[0], output[0])
+
+'''
 rule error_correction:
   input:
     rules.sort_and_index.output.bam
@@ -814,7 +820,7 @@ rule haplotypes_and_truth_heatmap:
     "envs/R.yml"
   script:
     "R/truth_heatmap.R"
-
+'''
 # Regress Haplo
 
 rule regress_haplo_bam_to_variant_calls:
