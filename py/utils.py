@@ -225,6 +225,15 @@ def covarying_truth(
         json.dump(result, output_file, indent=2)
 
 
+def restrict_fasta_to_cvs(input_fasta, input_cvs, output_fasta):
+    with open(input_cvs) as json_file:
+        cvs = json.load(json_file)
+    records = list(SeqIO.parse(input_fasta, 'fasta'))
+    for record in records:
+        record.seq = Seq(''.join([record.seq[site] for site in cvs]))
+    SeqIO.write(records, output_fasta, 'fasta')
+
+
 def downsample_bam(input_bam_path, output_bam_path, downsample_amount):
     downsample_percentage = 1 - int(downsample_amount) / 100
     input_bam = pysam.AlignmentFile(input_bam_path, 'rb')

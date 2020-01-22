@@ -555,6 +555,22 @@ rule readreduce:
 
 # ACME haplotype reconstruction
 
+def true_sequences_input(wildcards):
+  if wildcards.dataset == 'FiveVirusMixIllumina_1':
+    return "input/5VM.fasta"
+  dataset = wildcards.dataset.split('_')[0]
+  return "output/truth/%s/genomes.fasta" % dataset
+
+rule true_sequences:
+  input:
+    wgs=true_sequences_input,
+    reference=rules.situate_references.output[0]
+  output:
+    fasta="output/truth/{dataset}/{reference}_gene.fasta",
+    json="output/truth/{dataset}/{reference}_gene.json"
+  run:
+    extract_truth(input.wgs, input.reference, wildcards.dataset, wildcards.reference, output.fasta, output.json)
+
 rule covarying_sites:
   input:
     rules.sort_and_index.output.bam
@@ -572,7 +588,7 @@ rule superreads:
   run:
     superread_json_io(input.alignment, input.covarying_sites, output[0])
 
-rule sc_superread_fasta:
+rule superread_fasta:
   input:
     cvs=rules.covarying_sites.output[0],
     sr=rules.superreads.output[0]
@@ -580,6 +596,25 @@ rule sc_superread_fasta:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/superreads.fasta"
   run:
     superread_fasta_io(input.cvs, input.sr, output[0])
+
+rule truth_at_cvs:
+  input:
+    cvs=rules.covarying_sites.output[0],
+    fasta=rules.true_sequences.output.fasta
+  output:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/truth-cvs.fasta"
+  run:
+    restrict_fasta_to_cvs(input.fasta, input.cvs, output[0])
+
+rule truth_and_superreads_cvs:
+  input:
+    truth=rules.truth_at_cvs.output[0],
+    superreads=rules.superread_fasta.output[0]
+  output:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/truth-sr-cvs.fasta"
+  shell:
+    "cat {input.truth} {input.superreads} > {output}"
+
 
 '''
 rule covarying_truth:
@@ -716,22 +751,6 @@ rule single_mapping_data:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/mapping_data.csv"
   run:
     single_mapping_dataset(input.bam, input.reference, output[0])
-
-def true_sequences_input(wildcards):
-  if wildcards.dataset == 'FiveVirusMixIllumina_1':
-    return "input/5VM.fasta"
-  dataset = wildcards.dataset.split('_')[0]
-  return "output/truth/%s/genomes.fasta" % dataset
-
-rule true_sequences:
-  input:
-    wgs=true_sequences_input,
-    reference=rules.situate_references.output[0]
-  output:
-    fasta="output/truth/{dataset}/{reference}_gene.fasta",
-    json="output/truth/{dataset}/{reference}_gene.json"
-  run:
-    extract_truth(input.wgs, input.reference, wildcards.dataset, wildcards.reference, output.fasta, output.json)
 
 rule true_covarying_sites:
   input:
