@@ -6,6 +6,7 @@ from convex_qsr import covarying_sites_io
 from convex_qsr import superread_json_io
 from convex_qsr import superread_fasta_io
 from convex_qsr import full_graph_io
+from convex_qsr import reduced_graph_io
 
 from py import *
 
@@ -623,6 +624,14 @@ rule superread_graph:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/graph.json"
   run:
     full_graph_io(input[0], output[0])
+
+rule reduced_superread_graph:
+  input:
+    rules.superreads.output[0],
+  output:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/graph-reduced.json"
+  run:
+    reduced_graph_io(input[0], output[0])
 
 '''
 rule covarying_truth:
