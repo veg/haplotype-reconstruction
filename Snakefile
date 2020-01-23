@@ -618,12 +618,11 @@ rule truth_and_superreads_cvs:
 
 rule superread_graph:
   input:
-    superreads=rules.superreads.output[0],
-    cvs=rules.covarying_sites.output[0]
+    rules.superreads.output[0],
   output:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/graph.json"
   run:
-    full_graph_io(input.superreads, input.cvs, output[0])
+    full_graph_io(input[0], output[0])
 
 '''
 rule covarying_truth:
