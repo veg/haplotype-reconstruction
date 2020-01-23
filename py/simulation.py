@@ -4,6 +4,9 @@ from itertools import tee
 import numpy as np
 from Bio import SeqIO
 import pysam
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
 
 
 def extract_lanl_genome(lanl_input, lanl_id, fasta_output):
@@ -320,3 +323,29 @@ def evaluate_simulated_ar(lanl_ids, filename):
     for i, lanl_id in enumerate(lanl_ids):
         info[lanl_id] = strain_counts[i]/non_recombined_reads
     return info
+
+
+def n_paths_boxplot(simulated_dataset, gene, output_filepath):
+    template_string = "output/sim-%s_ar-%d_seed-%d/fastp/bowtie2/%s/acme/graph.json"
+    input_files = []
+    data_seeds = []
+    data_ars = []
+    data_npaths = []
+    for seed in range(1, 11):
+        for ar in [0, 5, 10, 15, 20]:
+            json_filepath = template_string % (simulated_dataset, ar, seed, gene)
+            with open(json_filepath) as json_file:
+                graph = json.load(json_file)
+            data_seeds.append(seed)
+            data_ars.append(ar)
+            data_npaths.append(graph['number_of_paths'])
+    df = pd.DataFrame({
+        "seed": data_seeds,
+        "ARRate": data_ars,
+        "LogNumberOfPaths": data_npaths,
+        "LogNumberOfPaths": np.log10(data_npaths),
+    })
+    fig, ax = plt.subplots(figsize=(10, 10))
+    sns.set(font_scale=5)
+    sns.boxplot(x='ARRate', y='LogNumberOfPaths', data=df, ax=ax)
+    fig.savefig(output_filepath)

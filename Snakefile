@@ -633,6 +633,25 @@ rule reduced_superread_graph:
   run:
     reduced_graph_io(input[0], output[0])
 
+# Simulation studies
+
+def n_paths_boxplot_input(wildcards):
+  template_string = "output/sim-%s_ar-%d_seed-%d/fastp/bowtie2/%s/acme/graph.json"
+  input_files = []
+  for seed in range(1, 11):
+    for ar in [0, 5, 10, 15, 20]:
+      parameters = (wildcards.simulated_dataset, ar, seed, wildcards.gene)
+      input_files.append(template_string % parameters)
+  return input_files
+
+rule n_paths_boxplot:
+  input:
+    n_paths_boxplot_input
+  output:
+    "output/simulation/{simulated_dataset}/n_paths_boxplot_{gene}.png"
+  run:
+    n_paths_boxplot(wildcards.simulated_dataset, wildcards.gene, output[0])
+
 '''
 rule covarying_truth:
   input:
