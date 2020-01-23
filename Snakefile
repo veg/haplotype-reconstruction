@@ -7,6 +7,7 @@ from convex_qsr import superread_json_io
 from convex_qsr import superread_fasta_io
 from convex_qsr import full_graph_io
 from convex_qsr import reduced_graph_io
+from convex_qsr import candidates_io
 
 from py import *
 
@@ -632,6 +633,15 @@ rule reduced_superread_graph:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/graph-reduced.json"
   run:
     reduced_graph_io(input[0], output[0])
+
+rule candidates:
+  input:
+    graph=rules.reduced_superread_graph.output[0],
+    superreads=rules.superreads.output[0]
+  output:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/describing.json"
+  run:
+    candidates_io(input.graph, input.superreads, output[0])
 
 # Simulation studies
 
