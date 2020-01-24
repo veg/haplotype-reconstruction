@@ -1,6 +1,7 @@
 const express = require('express'),
   fs = require('fs'),
-  bodyParser = require('body-parser');
+  bodyParser = require('body-parser'),
+  config = require('../config.json');
 
 app = express();
 app.use(bodyParser());
@@ -23,6 +24,6 @@ app.post('/api/files', (req, res) => {
 
 app.use('/api/static', express.static('output'));
 
-app.listen(8000, () => {
-  console.log('Listening on port 8000...');
+app.listen(config.api_port, () => {
+  console.log(`Listening on port ${config.api_port}...`);
 });

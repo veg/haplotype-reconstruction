@@ -1,4 +1,5 @@
-const HtmlWebpackPlugin = require('html-webpack-plugin');
+const HtmlWebpackPlugin = require('html-webpack-plugin'),
+  config = require('./config.json');
 
 module.exports = {
   entry: './js/app.js',
@@ -31,7 +32,7 @@ module.exports = {
     historyApiFallback: true,
     disableHostCheck: true,
     proxy: {
-      '/api': 'http://localhost:8000',
+      '/api': `http://localhost:${config.api_port}`,
       changeOrigin: true
     }
   }

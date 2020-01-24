@@ -6,6 +6,7 @@ savage-tests/
 .DS_Store
 .snakemake
 messages.log*
+config.json
 __pycache__
 node_modules
 yarn.lock
