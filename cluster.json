@@ -1,0 +1,13 @@
+{
+  "__default__": {
+    "cluster" : "qsub",
+    "nodes": 1,
+    "ppn": 1
+  },
+  "error_correction": {
+    "ppn": 24
+  },
+  "quasirecomb": {
+    "ppn": 12
+  }
+}

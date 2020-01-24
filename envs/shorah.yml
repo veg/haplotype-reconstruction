@@ -1,0 +1,38 @@
+name: shorah
+channels:
+  - stephenshank
+  - davebx
+  - conda-forge
+  - bioconda
+  - r
+  - defaults
+dependencies:
+  - _libgcc_mutex=0.1=main
+  - biopython=1.74=py36h516909a_0
+  - blas=1.1=openblas
+  - bzip2=1.0.8=h516909a_0
+  - ca-certificates=2019.6.16=hecc5488_0
+  - certifi=2019.6.16=py36_1
+  - gsl=1.16=0
+  - libffi=3.2.1=he1b5a44_1006
+  - libgcc-ng=9.1.0=hdf63c60_0
+  - libgfortran-ng=7.3.0=hdf63c60_0
+  - libstdcxx-ng=9.1.0=hdf63c60_0
+  - ncurses=5.9=10
+  - numpy=1.15.4=py36_blas_openblash1522bff_1000
+  - openblas=0.3.3=h9ac9557_1001
+  - openssl=1.0.2r=h14c3975_0
+  - perl=5.22.0.1=0
+  - pip=19.2.3=py36_0
+  - python=3.6.3=0
+  - readline=6.2=0
+  - samtools=1.3.1=0
+  - setuptools=41.2.0=py36_0
+  - shorah=1.1.2=py36pl5.22.0_0
+  - sqlite=3.13.0=1
+  - tk=8.5.19=2
+  - wheel=0.33.6=py36_0
+  - xz=5.2.4=h14c3975_1001
+  - zlib=1.2.8=3
+prefix: /home/sshank/Software/anaconda3/envs/shorah
+

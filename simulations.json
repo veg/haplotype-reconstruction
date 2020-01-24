@@ -1,17 +1,17 @@
 {
-  "diverged_1": [
+  "diverged1": [
     {
       "lanl_id": "B.CH.2002.HIV_CH_BID-V3527_2002.JQ403021",
       "frequency": 1
     }
   ],
-  "diverged_2": [
+  "diverged2": [
     {
       "lanl_id": "P.FR.2006.RBF168.GQ328744",
       "frequency": 1
     }
   ],
-  "diverged_joint": [
+  "divergedPair": [
     {
       "lanl_id": "B.CH.2002.HIV_CH_BID-V3527_2002.JQ403021",
       "frequency": 0.5
@@ -21,7 +21,7 @@
       "frequency": 0.5
     }
   ],
-  "diverged_joint_slightly_skewed": [
+  "divergedPairSlightlySkewed": [
     {
       "lanl_id": "B.CH.2002.HIV_CH_BID-V3527_2002.JQ403021",
       "frequency": 0.8
@@ -31,7 +31,7 @@
       "frequency": 0.2
     }
   ],
-  "diverged_joint_triplet": [
+  "divergedTriplet": [
     {
       "lanl_id": "B.CH.2002.HIV_CH_BID-V3527_2002.JQ403021",
       "frequency": 0.33
@@ -45,7 +45,7 @@
       "frequency": 0.34
     }
   ],
-  "diverged_joint_triplet_slightly_skewed": [
+  "divergedTripletSlightlySkewed": [
     {
       "lanl_id": "B.CH.2002.HIV_CH_BID-V3527_2002.JQ403021",
       "frequency": 0.5
@@ -59,21 +59,21 @@
       "frequency": 0.2
     }
   ],
-  "related_1": [
+  "related1": [
     {
       "lanl_id": "B.KR.2005.05CSR3.DQ837381",
       "frequency": 1
     }
   ],
-  "related_2": [
+  "related2": [
     {
       "lanl_id": "B.US.2012.505_0122a.WG08.MG196700",
       "frequency": 1
     }
   ],
-  "related_joint": [
+  "relatedPair": [
     {
-      "lanl_id": "B.KR.2005.05CSR3.DQ837381",
+      "lanl_id": "B.US.2012.505_0997a.WG06.MG196881",
       "frequency": 0.5
     },
     {
@@ -81,7 +81,17 @@
       "frequency": 0.5
     }
   ],
-  "diverged_five": [
+  "relatedPairSlightlySkewed": [
+    {
+      "lanl_id": "B.US.2012.505_0997a.WG06.MG196881",
+      "frequency": 0.8
+    },
+    {
+      "lanl_id": "B.US.2012.505_0122a.WG08.MG196700",
+      "frequency": 0.2
+    }
+  ],
+  "divergedFive": [
     {
       "lanl_id": "B.CH.2002.HIV_CH_BID-V3527_2002.JQ403021",
       "frequency": 0.2

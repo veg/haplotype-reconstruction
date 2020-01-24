@@ -1,33 +1,38 @@
-const path = require("path"),
-  HtmlWebpackPlugin = require("html-webpack-plugin");
+const HtmlWebpackPlugin = require('html-webpack-plugin');
 
 module.exports = {
-  entry: path.resolve("js", "app.jsx"),
+  entry: './js/app.js',
+  output: {
+    publicPath: '/'
+  },
   plugins: [
     new HtmlWebpackPlugin({
-      title: "ACME Haplotype Reconstruction",
-      filename: "dashboard.html"
+      title: "ACME Haplotype Reconstruction"
     })
   ],
   module: {
     rules: [
       {
-        test: /\.jsx$/,
-        exclude: /node_modules/,
-        loader: "babel-loader",
-        query: {
-          presets: ["@babel/react"]
-        }
+        test: /\.js$/,
+        loader: 'babel-loader'
       },
       {
-        test: /\.css$/,
-        use: ["style-loader", "css-loader"]
+        test: /\.scss$/,
+        use: [
+          'style-loader',
+          'css-loader',
+          'sass-loader'
+        ] 
       }
-    ]
+    ],
   },
-  devtool: "inline-source-map",
   devServer: {
-    contentBase: path.resolve(__dirname, "dist"),
-    historyApiFallback: true
+    host: '0.0.0.0',
+    historyApiFallback: true,
+    disableHostCheck: true,
+    proxy: {
+      '/api': 'http://localhost:8000',
+      changeOrigin: true
+    }
   }
-};
+}
