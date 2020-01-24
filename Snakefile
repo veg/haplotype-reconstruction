@@ -880,8 +880,12 @@ rule superread_agreement:
 
 
 def reference_input(wildcards):
-  format_string = "output/%s/%s_truth.fasta"
-  parameters = (wildcards.dataset, wildcards.reference)
+  format_string = "output/truth/%s/%s_gene.fasta"
+  if wildcards.dataset[:3] == 'sim':
+    dataset = wildcards.dataset.split('_')[0]
+  else:
+    dataset = wildcards.dataset
+  parameters = (dataset, wildcards.reference)
   return format_string % parameters
 
 
