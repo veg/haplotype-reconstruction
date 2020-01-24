@@ -8,6 +8,7 @@ from convex_qsr import superread_fasta_io
 from convex_qsr import full_graph_io
 from convex_qsr import reduced_graph_io
 from convex_qsr import candidates_io
+from convex_qsr import regression_io
 
 from py import *
 
@@ -578,9 +579,10 @@ rule covarying_sites:
   input:
     rules.sort_and_index.output.bam
   output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/covarying_sites.json"
+    json="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/covarying_sites.json",
+    fasta="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/consensus.fasta"
   run:
-    covarying_sites_io(input[0], output[0])
+    covarying_sites_io(input[0], output.json, output.fasta)
 
 rule superreads:
   input:
@@ -643,6 +645,20 @@ rule candidates:
   run:
     candidates_io(input.graph, input.superreads, output[0])
 
+rule regression:
+  input:
+    superreads=rules.superreads.output[0],
+    describing=rules.candidates.output[0],
+    consensus=rules.covarying_sites.output.fasta,
+    covarying_sites=rules.covarying_sites.output.json
+  output:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/haplotypes.fasta"
+  run:
+    regression_io(
+      input.superreads, input.describing, input.consensus,
+      input.covarying_sites, output[0]
+    )
+
 # Simulation studies
 
 def n_paths_boxplot_input(wildcards):
@@ -698,11 +714,6 @@ rule superread:
       output.full, output.cvs, output.describing, output.graph, output.candidates,
       minimum_weight=3
     )
-
-def reference_input(wildcards):
-  format_string = "output/%s/%s_truth.fasta"
-  parameters = (wildcards.dataset, wildcards.reference)
-  return format_string % parameters
 
 rule truth_and_candidates:
   input:
@@ -865,6 +876,14 @@ rule superread_agreement:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/superread_agreement.csv"
   run:
     superread_agreement(input.superreads, input.fasta, input.json, output[0])
+'''
+
+
+def reference_input(wildcards):
+  format_string = "output/%s/%s_truth.fasta"
+  parameters = (wildcards.dataset, wildcards.reference)
+  return format_string % parameters
+
 
 rule haplotypes_and_truth:
   input:
@@ -890,7 +909,7 @@ rule haplotypes_and_truth_heatmap:
     "envs/R.yml"
   script:
     "R/truth_heatmap.R"
-'''
+
 # Regress Haplo
 
 rule regress_haplo_bam_to_variant_calls:
