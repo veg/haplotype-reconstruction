@@ -933,6 +933,30 @@ def reference_input(wildcards):
   parameters = (dataset, wildcards.reference)
   return format_string % parameters
 
+rule haplotypes_and_truth_with_parameters:
+  input:
+    haplotypes=rules.regression.output[0],
+    truth=reference_input
+  output:
+    unaligned="output/{dataset}/{qc}/{read_mapper}/{reference}/{haplotyper}/truth_and_haplotypes_unaligned-{graph_type}_mw-{mw}_wp-{wp}.fasta",
+    aligned="output/{dataset}/{qc}/{read_mapper}/{reference}/{haplotyper}/truth_and_haplotypes-{graph_type}_mw-{mw}_wp-{wp}.fasta",
+    csv="output/{dataset}/{qc}/{read_mapper}/{reference}/{haplotyper}/truth_and_haplotypes-{graph_type}_mw-{mw}_wp-{wp}.csv",
+    json="output/{dataset}/{qc}/{read_mapper}/{reference}/{haplotyper}/truth_and_haplotypes-{graph_type}_mw-{mw}_wp-{wp}.json"
+  run:
+    shell("cat {input.haplotypes} {input.truth} > {output.unaligned}")
+    shell("mafft {output.unaligned} > {output.aligned}")
+    pairwise_distance_csv(output.aligned, output.csv)
+    result_json(output.csv, output.json)
+
+rule haplotypes_and_truth_heatmap_with_parameters:
+  input:
+    rules.haplotypes_and_truth_with_parameters.output.csv
+  output:
+    png="output/{dataset}/{qc}/{read_mapper}/{reference}/{haplotyper}/truth_and_haplotypes-{graph_type}_mw-{mw}_wp-{wp}.png"
+  conda:
+    "envs/R.yml"
+  script:
+    "R/truth_heatmap.R"
 
 rule haplotypes_and_truth:
   input:
