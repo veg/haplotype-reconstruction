@@ -357,10 +357,30 @@ rule bwa:
       bwa mem {input.reference} {input.fastq} > {output}
     """
 
-rule bowtie2:
+rule bowtie2_index:
+  input:
+    reference="output/references/{reference}.fasta"
+  output:
+    bt1="output/references/{reference}.1.bt2",
+    bt2="output/references/{reference}.2.bt2",
+    bt3="output/references/{reference}.3.bt2",
+    bt4="output/references/{reference}.4.bt2",
+    revbt1="output/references/{reference}.rev.1.bt2",
+    revbt2="output/references/{reference}.rev.2.bt2"
+  params:
+    lambda wildcards: "output/references/%s" % wildcards.reference
+  shell:
+    "bowtie2-build {input.reference} {params}"
+
+rule bowtie2_alignment:
   input:
     fastq="output/{dataset}/{qc}/qc.fastq",
-    reference="output/references/{reference}.fasta"
+    bt1=rules.bowtie2_index.output.bt1,
+    bt2=rules.bowtie2_index.output.bt2,
+    bt3=rules.bowtie2_index.output.bt3,
+    bt4=rules.bowtie2_index.output.bt4,
+    revbt1=rules.bowtie2_index.output.revbt1,
+    revbt2=rules.bowtie2_index.output.revbt2
   output:
     sam="output/{dataset}/{qc}/bowtie2/{reference}/mapped.sam",
     bam="output/{dataset}/{qc}/bowtie2/{reference}/mapped.bam"
@@ -370,7 +390,6 @@ rule bowtie2:
     "envs/ngs.yml"
   shell:
     """
-      bowtie2-build {input.reference} {params}
       bowtie2 -x {params} -U {input.fastq} -S {output.sam}
       samtools view -Sb {output.sam} > {output.bam}
     """
