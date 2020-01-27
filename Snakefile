@@ -5,8 +5,7 @@ import pysam
 from convex_qsr import covarying_sites_io
 from convex_qsr import superread_json_io
 from convex_qsr import superread_fasta_io
-from convex_qsr import full_graph_io
-from convex_qsr import reduced_graph_io
+from convex_qsr import graph_io
 from convex_qsr import candidates_io
 from convex_qsr import regression_io
 
@@ -643,9 +642,9 @@ rule superread_graph:
   input:
     rules.superreads.output[0],
   output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/graph.json"
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/graph-full.json"
   run:
-    full_graph_io(input[0], output[0])
+    graph_io(input[0], output[0], 'full')
 
 rule reduced_superread_graph:
   input:
@@ -653,16 +652,15 @@ rule reduced_superread_graph:
   output:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/graph-reduced.json"
   run:
-    reduced_graph_io(input[0], output[0])
+    graph_io(input[0], output[0], 'reduced')
 
 rule candidates:
   input:
-    graph=rules.reduced_superread_graph.output[0],
-    superreads=rules.superreads.output[0]
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/graph-{graph_type}.json",
   output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/describing.json"
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/describing-{graph_type}.json"
   run:
-    candidates_io(input.graph, input.superreads, output[0])
+    candidates_io(input[0], output[0])
 
 rule regression:
   input:
@@ -671,12 +669,20 @@ rule regression:
     consensus=rules.covarying_sites.output.fasta,
     covarying_sites=rules.covarying_sites.output.json
   output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/haplotypes.fasta"
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/haplotypes-{graph_type}.fasta"
   run:
     regression_io(
       input.superreads, input.describing, input.consensus,
       input.covarying_sites, output[0]
     )
+
+rule chosen_approach:
+  input:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/haplotypes-reduced.fasta"
+  output:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/haplotypes.fasta"
+  shell:
+    "cp {input} {output}"
 
 # Simulation studies
 
