@@ -697,6 +697,14 @@ rule n_paths_boxplot:
   run:
     n_paths_boxplot(wildcards.simulated_dataset, wildcards.gene, output[0])
 
+rule superread_weight_distribution_data:
+  input:
+    rules.superreads.output[0]
+  output:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/superread_distribution.csv"
+  run:
+    superread_weight_distribution_data(input[0], output[0])
+
 '''
 rule covarying_truth:
   input:

@@ -1,3 +1,4 @@
+import csv
 import json
 from itertools import tee
 
@@ -349,3 +350,21 @@ def n_paths_boxplot(simulated_dataset, gene, output_filepath):
     sns.set(font_scale=5)
     sns.boxplot(x='ARRate', y='LogNumberOfPaths', data=df, ax=ax)
     fig.savefig(output_filepath)
+
+
+def superread_weight_distribution_data(superreads_filepath, csv_filepath):
+    with open(superreads_filepath) as json_file:
+        superreads = json.load(json_file)
+    csv_file = open(csv_filepath, 'w')
+    csv_writer = csv.DictWriter(csv_file, fieldnames=['weight', 'composition'])
+    csv_writer.writeheader()
+    for superread in superreads:
+        composition = max(
+            superread['composition'].items(),
+            key=lambda i: i[1]
+        )[0]
+        csv_writer.writerow({
+            'weight': superread['weight'],
+            'composition': composition
+        })
+    csv_file.close()
