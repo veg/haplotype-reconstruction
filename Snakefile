@@ -705,6 +705,14 @@ rule superread_weight_distribution_data:
   run:
     superread_weight_distribution_data(input[0], output[0])
 
+rule superread_weight_distribution_plot:
+  input:
+    rules.superread_weight_distribution_data.output[0]
+  output:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/superread_distribution.png"
+  script:
+    "R/superread_distribution.R"
+
 '''
 rule covarying_truth:
   input:
