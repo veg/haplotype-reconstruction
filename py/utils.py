@@ -119,8 +119,11 @@ def pairwise_distance_csv(fasta_filename, csv_filename):
     first_records = []
     second_records = []
     distances = []
+    search_term = 'quasispecies'
     for i in range(len(records)):
         for j in range(len(records)):
+            if records[j].name[: len(search_term)] == search_term:
+                continue
             first_records.append(records[i].id)
             second_records.append(records[j].id)
             distance = (np_seqs[i, :] != np_seqs[j, :]).sum()
@@ -367,6 +370,7 @@ def result_json(distance_csv, output_json):
     second_is_quasispecies = df.second_record.apply(lambda x: x[:3] == 'qua')
     results = {}
     for record in desired_records:
+        if record[:3] != 'qua': continue
         first_is_desired = df.first_record == record
         best_match_index = df.loc[
             first_is_desired & second_is_quasispecies, 'distance'
