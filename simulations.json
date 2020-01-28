@@ -21,6 +21,16 @@
       "frequency": 0.5
     }
   ],
+  "epidemicPair": [
+    {
+      "lanl_id": "A1.UG.1998.98UG57134.AF484507",
+      "frequency": 0.5
+    },
+    {
+      "lanl_id": "D.UG.1998.98UG57143.AF484514",
+      "frequency": 0.5
+    }
+  ],
   "divergedPairSlightlySkewed": [
     {
       "lanl_id": "B.CH.2002.HIV_CH_BID-V3527_2002.JQ403021",

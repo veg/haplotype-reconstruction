@@ -281,7 +281,7 @@ def simulation_truth(dataset, output_fasta):
 
 def simulate_wgs_dataset(
         dataset, ar, input_fasta, output_fastq, output_json,
-        seed=1, number_of_reads=200000
+        seed=1, number_of_reads=300000
         ):
     np.random.seed(int(seed))
     ar = float(ar)/100
