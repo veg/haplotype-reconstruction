@@ -63,8 +63,7 @@ rule all_haplotypers:
 
 rule all_acme_running:
   input:
-    "output/FiveVirusMixIllumina_1/fastp/bowtie2/gag/acme/truth_and_haplotypes.json",
-    "output/FiveVirusMixIllumina_1/fastp/bowtie2/pol/acme/truth_and_haplotypes.json"
+    "output/sim-divergedFive_ar-10_seed-1/fastp/bowtie2/pol/acme/truth_and_haplotypes.json"
   output:
     "output/running_report.csv"
   run:
@@ -72,11 +71,8 @@ rule all_acme_running:
 
 rule all_acme_reconstructing:
   input:
-    "output/sim-diverged_pair/fastp/bowtie2/pol/acme/truth_and_haplotypes.json",
-    "output/sim-diverged_pair_slightly_skewed/fastp/bowtie2/pol/acme/truth_and_haplotypes.json",
-    "output/sim-diverged_triplet/fastp/bowtie2/pol/acme/truth_and_haplotypes.json",
-    "output/sim-diverged_triplet_slightly_skewed/fastp/bowtie2/pol/acme/truth_and_haplotypes.json",
-    "output/sim-diverged_five/fastp/bowtie2/pol/acme/truth_and_haplotypes.json"
+    "output/sim-divergedPair_ar-10_seed-1/fastp/bowtie2/pol/acme/truth_and_haplotypes.json",
+    "output/sim-divergedTriplet_ar-10_seed-1/fastp/bowtie2/pol/acme/truth_and_haplotypes.json"
   output:
     "output/reconstruction_report.csv"
   run:
@@ -683,7 +679,7 @@ rule regression:
 
 rule chosen_approach:
   input:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/haplotypes-reduced_mw-3_wp-10.fasta"
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/haplotypes-reduced_mw-5_wp-50.fasta"
   output:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/haplotypes.fasta"
   shell:
