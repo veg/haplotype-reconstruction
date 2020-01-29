@@ -183,9 +183,10 @@ rule simulation_truth_aligned:
   input:
     rules.simulation_truth.output[0],
   output:
-    "output/truth/sim-{simulated_dataset}/aligned.fasta"
+    fasta="output/truth/sim-{simulated_dataset}/aligned.fasta",
+    progress=os.getcwd()+"/output/truth/sim-{simulated_dataset}/progress.txt"
   shell:
-    "mafft {input} > {output}"
+    "mafft --progress {output.progress} {input} > {output.fasta}"
 
 def wgs_simulation_inputs(wildcards):
   dataset = SIMULATION_INFORMATION[wildcards.simulated_dataset]
@@ -965,6 +966,7 @@ rule haplotypes_and_truth_with_parameters:
   output:
     unaligned="output/{dataset}/{qc}/{read_mapper}/{reference}/{haplotyper}/truth_and_haplotypes_unaligned-{graph_type}_mw-{mw}_wp-{wp}_ek-{ek}.fasta",
     aligned="output/{dataset}/{qc}/{read_mapper}/{reference}/{haplotyper}/truth_and_haplotypes-{graph_type}_mw-{mw}_wp-{wp}_ek-{ek}.fasta",
+    aligned=os.getcwd()+"/output/{dataset}/{qc}/{read_mapper}/{reference}/{haplotyper}/progresst-{graph_type}_mw-{mw}_wp-{wp}_ek-{ek}.txt",
     csv="output/{dataset}/{qc}/{read_mapper}/{reference}/{haplotyper}/truth_and_haplotypes-{graph_type}_mw-{mw}_wp-{wp}_ek-{ek}.csv",
     json="output/{dataset}/{qc}/{read_mapper}/{reference}/{haplotyper}/truth_and_haplotypes-{graph_type}_mw-{mw}_wp-{wp}_ek-{ek}.json"
   run:
@@ -990,11 +992,12 @@ rule haplotypes_and_truth:
   output:
     unaligned="output/{dataset}/{qc}/{read_mapper}/{reference}/{haplotyper}/truth_and_haplotypes_unaligned.fasta",
     aligned="output/{dataset}/{qc}/{read_mapper}/{reference}/{haplotyper}/truth_and_haplotypes.fasta",
+    progress=os.getcwd()+"output/{dataset}/{qc}/{read_mapper}/{reference}/{haplotyper}/progress.txt",
     csv="output/{dataset}/{qc}/{read_mapper}/{reference}/{haplotyper}/truth_and_haplotypes.csv",
     json="output/{dataset}/{qc}/{read_mapper}/{reference}/{haplotyper}/truth_and_haplotypes.json"
   run:
     shell("cat {input.haplotypes} {input.truth} > {output.unaligned}")
-    shell("mafft {output.unaligned} > {output.aligned}")
+    shell("mafft --progress {output.progress} {output.unaligned} > {output.aligned}")
     pairwise_distance_csv(output.aligned, output.csv)
     result_json(output.csv, output.json)
 
