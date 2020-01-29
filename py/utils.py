@@ -496,3 +496,12 @@ def superread_agreement(input_superreads, input_fasta, input_json, output_csv):
             'stop': stop
         })
     csvfile.close()
+
+
+def superread_scatter_data(superread_path, output_csv):
+    with open(superread_path) as json_file:
+        superreads = json.load(json_file)
+    pd.DataFrame({
+        'weight': [sr['weight'] for sr in superreads],
+        'vacs_length': [len(sr['vacs']) for sr in superreads],
+    }).to_csv(output_csv)

@@ -617,6 +617,22 @@ rule superread_fasta:
   run:
     superread_fasta_io(input.cvs, input.sr, output[0])
 
+rule superread_scatter_data:
+  input:
+    rules.superreads.output[0]
+  output:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/superreads.csv"
+  run:
+    superread_scatter_data(input[0], output[0])
+
+rule superread_scatter_plot:
+  input:
+    rules.superread_scatter_data.output[0]
+  output:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/superread_scatter.png"
+  script:
+    "R/superread_scatterplot.R"
+
 rule truth_at_cvs:
   input:
     cvs=rules.covarying_sites.output[0],
