@@ -647,19 +647,31 @@ rule reduced_superread_graph:
   input:
     rules.superreads.output[0],
   output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/graph-reduced_mw-{mw}_wp-{wp}.json"
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/graph-reduced_mw-{mw}_wp-{wp}_ek-{ek}.json"
   run:
     graph_io(
       input[0], output[0], 'reduced',
       weight_percentile_cutoff=int(wildcards.wp)/100,
-      minimum_weight=int(wildcards.mw)
+      minimum_weight=int(wildcards.mw), edge_key=wildcards.ek
+    )
+
+rule incremental_superread_graph:
+  input:
+    rules.superreads.output[0],
+  output:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/graph-incremental_mw-{mw}_wp-{wp}_ek-{ek}.json"
+  run:
+    graph_io(
+      input[0], output[0], 'incremental',
+      weight_percentile_cutoff=int(wildcards.wp)/100,
+      minimum_weight=int(wildcards.mw), edge_key=wildcards.ek
     )
 
 rule candidates:
   input:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/graph-{graph_type}_mw-{mw}_wp-{wp}.json",
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/graph-{graph_type}_mw-{mw}_wp-{wp}_ek-{ek}.json",
   output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/describing-{graph_type}_mw-{mw}_wp-{wp}.json"
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/describing-{graph_type}_mw-{mw}_wp-{wp}_ek-{ek}.json"
   run:
     candidates_io(input[0], output[0])
 
@@ -670,7 +682,7 @@ rule regression:
     consensus=rules.covarying_sites.output.fasta,
     covarying_sites=rules.covarying_sites.output.json
   output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/haplotypes-{graph_type}_mw-{mw}_wp-{wp}.fasta"
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/haplotypes-{graph_type}_mw-{mw}_wp-{wp}_ek-{ek}.fasta"
   run:
     regression_io(
       input.superreads, input.describing, input.consensus,
@@ -679,7 +691,7 @@ rule regression:
 
 rule chosen_approach:
   input:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/haplotypes-reduced_mw-5_wp-50.fasta"
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/haplotypes-reduced_mw-5_wp-50_ek-overlap.fasta"
   output:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/haplotypes.fasta"
   shell:
@@ -935,10 +947,10 @@ rule haplotypes_and_truth_with_parameters:
     haplotypes=rules.regression.output[0],
     truth=reference_input
   output:
-    unaligned="output/{dataset}/{qc}/{read_mapper}/{reference}/{haplotyper}/truth_and_haplotypes_unaligned-{graph_type}_mw-{mw}_wp-{wp}.fasta",
-    aligned="output/{dataset}/{qc}/{read_mapper}/{reference}/{haplotyper}/truth_and_haplotypes-{graph_type}_mw-{mw}_wp-{wp}.fasta",
-    csv="output/{dataset}/{qc}/{read_mapper}/{reference}/{haplotyper}/truth_and_haplotypes-{graph_type}_mw-{mw}_wp-{wp}.csv",
-    json="output/{dataset}/{qc}/{read_mapper}/{reference}/{haplotyper}/truth_and_haplotypes-{graph_type}_mw-{mw}_wp-{wp}.json"
+    unaligned="output/{dataset}/{qc}/{read_mapper}/{reference}/{haplotyper}/truth_and_haplotypes_unaligned-{graph_type}_mw-{mw}_wp-{wp}_ek-{ek}.fasta",
+    aligned="output/{dataset}/{qc}/{read_mapper}/{reference}/{haplotyper}/truth_and_haplotypes-{graph_type}_mw-{mw}_wp-{wp}_ek-{ek}.fasta",
+    csv="output/{dataset}/{qc}/{read_mapper}/{reference}/{haplotyper}/truth_and_haplotypes-{graph_type}_mw-{mw}_wp-{wp}_ek-{ek}.csv",
+    json="output/{dataset}/{qc}/{read_mapper}/{reference}/{haplotyper}/truth_and_haplotypes-{graph_type}_mw-{mw}_wp-{wp}_ek-{ek}.json"
   run:
     shell("cat {input.haplotypes} {input.truth} > {output.unaligned}")
     shell("mafft {output.unaligned} > {output.aligned}")
@@ -949,7 +961,7 @@ rule haplotypes_and_truth_heatmap_with_parameters:
   input:
     rules.haplotypes_and_truth_with_parameters.output.csv
   output:
-    png="output/{dataset}/{qc}/{read_mapper}/{reference}/{haplotyper}/truth_and_haplotypes-{graph_type}_mw-{mw}_wp-{wp}.png"
+    png="output/{dataset}/{qc}/{read_mapper}/{reference}/{haplotyper}/truth_and_haplotypes-{graph_type}_mw-{mw}_wp-{wp}_ek-{ek}.png"
   conda:
     "envs/R.yml"
   script:
