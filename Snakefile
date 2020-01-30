@@ -484,6 +484,8 @@ rule quasirecomb:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/quasirecomb/haplotypes.fasta"
   params:
     basedir="output/{dataset}/{qc}/{read_mapper}/{reference}/quasirecomb"
+  conda:
+    "envs/quasirecomb.yml"
   shell:
     """
       java -jar QuasiRecomb.jar -conservative -o {params.basedir} -i {input}
