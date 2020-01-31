@@ -478,8 +478,8 @@ rule quasirecomb_jar:
 
 rule quasirecomb:
   input:
-    rules.quasirecomb_jar.output[0],
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.bam"
+    jar=rules.quasirecomb_jar.output[0],
+    bam="output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.bam"
   output:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/quasirecomb/haplotypes.fasta"
   params:
@@ -488,7 +488,7 @@ rule quasirecomb:
     "envs/quasirecomb.yml"
   shell:
     """
-      java -jar QuasiRecomb.jar -conservative -o {params.basedir} -i {input}
+      java -jar QuasiRecomb.jar -conservative -o {params.basedir} -i {input.bam}
       mv {params.basedir}/quasispecies.fasta {params.basedir}/haplotypes.fasta
     """
 

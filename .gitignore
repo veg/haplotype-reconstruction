@@ -24,3 +24,4 @@ compartmentalization.json
 *.jar
 tags*
 .tern-port
+yalc.lock
