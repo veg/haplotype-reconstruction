@@ -602,6 +602,24 @@ rule covarying_sites:
   run:
     covarying_sites_io(input[0], output.json, output.fasta)
 
+rule true_covarying_sites:
+  input:
+    rules.true_sequences.output.fasta
+  output:
+    "output/truth/{dataset}/{reference}_covarying_sites.json"
+  run:
+    covarying_sites(input[0], output[0])
+
+rule covarying_truth_comparison:
+  input:
+    computed=rules.covarying_sites.output.json,
+    reference=rules.situate_references.output[0],
+    truth=rules.true_covarying_sites.output[0]
+  output:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/covarying_truth.json"
+  run:
+    covarying_truth(input.computed, input.reference, output[0])
+
 rule superreads:
   input:
     alignment=rules.sort_and_index.output.bam,

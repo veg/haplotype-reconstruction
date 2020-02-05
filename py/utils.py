@@ -191,13 +191,19 @@ def extract_truth(
         json.dump(pairwise_distances, json_file, indent=2)
 
 def covarying_truth(
-        input_computed, input_actual, input_reference, output_json
+        input_computed, input_reference, output_json
         ):
+    dataset = input_computed.split('/')[1]
+    if dataset != 'FiveVirusMixIllumina_1':
+        dataset = dataset.split('_')[0]
+    reference_name = input_reference.split('/')[-1].split('.')[0]
+    actual = "output/truth/%s/%s_covarying_sites.json" % (dataset, reference_name)
+
     reference = SeqIO.read(input_reference, 'fasta')
     rl = len(reference.seq)
     with open(input_computed) as input_file:
         cvs = json.load(input_file)
-    with open(input_actual) as input_file:
+    with open(actual) as input_file:
         true_cvs = json.load(input_file)
 
     tp = []
