@@ -505,3 +505,98 @@ def superread_scatter_data(superread_path, output_csv):
         'weight': [sr['weight'] for sr in superreads],
         'vacs_length': [len(sr['vacs']) for sr in superreads],
     }).to_csv(output_csv)
+
+
+## HK getProportionAr_5.py
+def quantify_ar(input_fasta, superread_path, output_json_path):
+    ## [1] SR weight threshold should depend on the sample total reads.
+    ## 0.1% of the entire FiveVirusMixture "read depth" (30,000 reads) is 30;
+    ## In ART-simulated, 4000 reads, 1% will be 40.
+    ######### Could this threshold be too strict?        ########################
+    ######### Is there a non-html file that writes this? ########################
+    readdepth_thres=0 # currently fixed at zero
+
+    # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+    # Call files                                                              #
+    # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+
+    ## Get all reference sequences
+    refNames=[]
+    refs=[]
+    with open(input_fasta,'r') as myFile:
+        for l in myFile:
+            if l.startswith('>') and l.startswith('>superread')==False:
+                refNames.append(l.rstrip().lstrip('>'))
+                refs.append('')
+            elif l.startswith('>superread'): break
+            else: refs[-1]+=l.rstrip()
+
+    ## Get json file where I can get: superread sequence, indices, and weights
+    with open(superread_path,'r') as json_file:
+        superread_json=json.load(json_file)
+
+    # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+    # Obtain superreads with clear evidence of AR                             #
+    # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+    ## Get recombined vs nonrecombined
+    ar_total=set() # clear evidence of artificial recombination
+    identical_total=set() # entire fragments exactly from ref
+    misc_total=set() # either all nt mutated or all from other strain
+    superreads=[]
+    for ref in refs:
+        ar_bin=[]
+        identical_bin=[]
+        misc_bin=[]
+        ## Iterate over superread_json
+        for superread_info in superread_json:
+            ## Extract variables
+            if superread_info["weight"]>readdepth_thres: 
+                superreads.append(superread_info["index"])
+                current_sr=superread_info["index"]
+                myRead=superread_info["vacs"]
+                first_ind=superread_info["cv_start"]
+                last_ind_p1=superread_info["cv_end"]
+                refFrag=ref[first_ind:last_ind_p1]
+                if myRead==refFrag: identical_bin.append(current_sr)
+                else:
+                    indSubseq_ends=set(['_'.join([str(j) for j in [0,i]]) for i in range(1,len(refFrag)+1)])
+                    indSubseq_ends=indSubseq_ends|set(['_'.join([str(j) for j in [i,len(refFrag)]]) for i in range(0,len(refFrag)+1)])
+                    indSubseq_ends=indSubseq_ends-{'_'.join([str(j) for j in [0,len(refFrag)]]),'_'.join([str(j) for j in [len(refFrag),len(refFrag)]])}
+                    indSubseq_ends=sorted([[int(j) for j in i.split('_')] for i in indSubseq_ends])
+                    isOverlap=False
+                    for ends in indSubseq_ends:
+                        if refFrag[ends[0]:ends[1]]==myRead[ends[0]:ends[1]]:
+                            isOverlap=True
+                    if isOverlap: ar_bin.append(current_sr)
+                    else: misc_bin.append(current_sr)
+        ar_total=ar_total|set(ar_bin)
+        identical_total=identical_total|set(identical_bin)
+        misc_total=misc_total|set(misc_bin)
+    ## Remove potential set intersects
+    ar_total=ar_total-identical_total
+    misc_total=misc_total-identical_total-ar_total
+
+    # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+    # Add weights to AR superreads                                            #
+    # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+    superreads_count_weights=0
+    for item in superread_json:
+        superreads_count_weights+=item["weight"]
+    ar_weighted=0
+    for ar in ar_total:
+        ar_weighted+=superread_json[ar]["weight"]
+    
+    # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+    # Write json                                                              #
+    # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+    to_write = [{ "fasta_name": input_fasta, \
+                 "json_name": superread_path, \
+                 "ar_indices": sorted(list(ar_total)), \
+                 "superreads_length": len(superreads), \
+                 "ar_weighted": ar_weighted, \
+                 "superreads_tot_weighted": superreads_count_weights, \
+                 "quantify_ar": ar_weighted/superreads_count_weights
+                 }]
+    with open(output_json_path, 'w') as fp:
+        json.dump(to_write, fp, indent=2)
+
