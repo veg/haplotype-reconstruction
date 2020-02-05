@@ -509,13 +509,6 @@ def superread_scatter_data(superread_path, output_csv):
 
 ## HK getProportionAr_5.py
 def quantify_ar(input_fasta, superread_path, output_json_path):
-    ## [1] SR weight threshold should depend on the sample total reads.
-    ## 0.1% of the entire FiveVirusMixture "read depth" (30,000 reads) is 30;
-    ## In ART-simulated, 4000 reads, 1% will be 40.
-    ######### Could this threshold be too strict?        ########################
-    ######### Is there a non-html file that writes this? ########################
-    readdepth_thres=0 # currently fixed at zero
-
     # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
     # Call files                                                              #
     # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
@@ -550,25 +543,24 @@ def quantify_ar(input_fasta, superread_path, output_json_path):
         ## Iterate over superread_json
         for superread_info in superread_json:
             ## Extract variables
-            if superread_info["weight"]>readdepth_thres: 
-                superreads.append(superread_info["index"])
-                current_sr=superread_info["index"]
-                myRead=superread_info["vacs"]
-                first_ind=superread_info["cv_start"]
-                last_ind_p1=superread_info["cv_end"]
-                refFrag=ref[first_ind:last_ind_p1]
-                if myRead==refFrag: identical_bin.append(current_sr)
-                else:
-                    indSubseq_ends=set(['_'.join([str(j) for j in [0,i]]) for i in range(1,len(refFrag)+1)])
-                    indSubseq_ends=indSubseq_ends|set(['_'.join([str(j) for j in [i,len(refFrag)]]) for i in range(0,len(refFrag)+1)])
-                    indSubseq_ends=indSubseq_ends-{'_'.join([str(j) for j in [0,len(refFrag)]]),'_'.join([str(j) for j in [len(refFrag),len(refFrag)]])}
-                    indSubseq_ends=sorted([[int(j) for j in i.split('_')] for i in indSubseq_ends])
-                    isOverlap=False
-                    for ends in indSubseq_ends:
-                        if refFrag[ends[0]:ends[1]]==myRead[ends[0]:ends[1]]:
-                            isOverlap=True
-                    if isOverlap: ar_bin.append(current_sr)
-                    else: misc_bin.append(current_sr)
+            superreads.append(superread_info["index"])
+            current_sr=superread_info["index"]
+            myRead=superread_info["vacs"]
+            first_ind=superread_info["cv_start"]
+            last_ind_p1=superread_info["cv_end"]
+            refFrag=ref[first_ind:last_ind_p1]
+            if myRead==refFrag: identical_bin.append(current_sr)
+            else:
+                indSubseq_ends=set(['_'.join([str(j) for j in [0,i]]) for i in range(1,len(refFrag)+1)])
+                indSubseq_ends=indSubseq_ends|set(['_'.join([str(j) for j in [i,len(refFrag)]]) for i in range(0,len(refFrag)+1)])
+                indSubseq_ends=indSubseq_ends-{'_'.join([str(j) for j in [0,len(refFrag)]]),'_'.join([str(j) for j in [len(refFrag),len(refFrag)]])}
+                indSubseq_ends=sorted([[int(j) for j in i.split('_')] for i in indSubseq_ends])
+                isOverlap=False
+                for ends in indSubseq_ends:
+                    if refFrag[ends[0]:ends[1]]==myRead[ends[0]:ends[1]]:
+                        isOverlap=True
+                if isOverlap: ar_bin.append(current_sr)
+                else: misc_bin.append(current_sr)
         ar_total=ar_total|set(ar_bin)
         identical_total=identical_total|set(identical_bin)
         misc_total=misc_total|set(misc_bin)
@@ -591,11 +583,12 @@ def quantify_ar(input_fasta, superread_path, output_json_path):
     # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
     to_write = [{ "fasta_name": input_fasta, \
                  "json_name": superread_path, \
-                 "ar_indices": sorted(list(ar_total)), \
-                 "superreads_length": len(superreads), \
+                 "quantify_ar": ar_weighted/superreads_count_weights, \
                  "ar_weighted": ar_weighted, \
                  "superreads_tot_weighted": superreads_count_weights, \
-                 "quantify_ar": ar_weighted/superreads_count_weights
+                 "superreads_unweighted_length": len(superreads), \
+                 "ar_unweighted_length": len(ar_total), \
+                 "ar_indices": sorted(list(ar_total))
                  }]
     with open(output_json_path, 'w') as fp:
         json.dump(to_write, fp, indent=2)
