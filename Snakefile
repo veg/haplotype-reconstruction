@@ -578,9 +578,9 @@ rule readreduce:
 # ACME haplotype reconstruction
 
 def true_sequences_input(wildcards):
-  if wildcards.dataset == 'FiveVirusMixIllumina_1':
+  if wildcards.known_dataset == 'FiveVirusMixIllumina_1':
     return "input/5VM.fasta"
-  dataset = wildcards.dataset.split('_')[0]
+  dataset = wildcards.known_dataset.split('_')[0]
   return "output/truth/%s/genomes.fasta" % dataset
 
 rule true_sequences:
@@ -588,10 +588,10 @@ rule true_sequences:
     wgs=true_sequences_input,
     reference=rules.situate_references.output[0]
   output:
-    fasta="output/truth/{dataset}/{reference}_gene.fasta",
-    json="output/truth/{dataset}/{reference}_gene.json"
+    fasta="output/truth/{known_dataset}/{reference}_gene.fasta",
+    json="output/truth/{known_dataset}/{reference}_gene.json"
   run:
-    extract_truth(input.wgs, input.reference, wildcards.dataset, wildcards.reference, output.fasta, output.json)
+    extract_truth(input.wgs, input.reference, wildcards.known_dataset, wildcards.reference, output.fasta, output.json)
 
 rule covarying_sites:
   input:
@@ -606,19 +606,30 @@ rule true_covarying_sites:
   input:
     rules.true_sequences.output.fasta
   output:
-    "output/truth/{dataset}/{reference}_covarying_sites.json"
+    "output/truth/{known_dataset}/{reference}_covarying_sites.json"
   run:
     covarying_sites(input[0], output[0])
 
+def covarying_truth_comparison_input(wildcards):
+    dataset = wildcards.dataset
+    if dataset != 'FiveVirusMixIllumina_1':
+      known_dataset = dataset.split('_')[0]
+    else:
+      known_dataset = dataset
+    computed_string = "output/%s/%s/%s/%s/acme/covarying_sites.json"
+    computed_arguments = (dataset, wildcards.qc, wildcards.read_mapper, wildcards.reference)
+    computed = computed_string % computed_arguments
+    truth = "output/truth/%s/%s_covarying_sites.json" % (known_dataset, wildcards.reference)
+    reference = "output/references/%s.fasta" % wildcards.reference
+    return [computed, truth, reference]
+
 rule covarying_truth_comparison:
   input:
-    computed=rules.covarying_sites.output.json,
-    reference=rules.situate_references.output[0],
-    truth=rules.true_covarying_sites.output[0]
+    covarying_truth_comparison_input
   output:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/covarying_truth.json"
   run:
-    covarying_truth(input.computed, input.reference, output[0])
+    covarying_truth(input[0], input[1], input[2], output[0])
 
 rule superreads:
   input:
