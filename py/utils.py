@@ -191,13 +191,13 @@ def extract_truth(
         json.dump(pairwise_distances, json_file, indent=2)
 
 def covarying_truth(
-        input_computed, input_actual, input_reference, output_json
+        input_computed, input_truth, input_reference, output_json
         ):
     reference = SeqIO.read(input_reference, 'fasta')
     rl = len(reference.seq)
     with open(input_computed) as input_file:
         cvs = json.load(input_file)
-    with open(input_actual) as input_file:
+    with open(input_truth) as input_file:
         true_cvs = json.load(input_file)
 
     tp = []
