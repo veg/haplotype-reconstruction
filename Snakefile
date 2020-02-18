@@ -407,6 +407,14 @@ rule sort_and_index:
       samtools index {output.bam}
     """
 
+rule read_statistics:
+  input:
+    rules.sort_and_index.output.bam
+  output:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/stats.csv"
+  run:
+    read_statistics(input[0], output[0])
+
 rule sorted_fasta:
   input:
     rules.sort_and_index.output.bam

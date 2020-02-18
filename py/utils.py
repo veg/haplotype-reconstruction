@@ -505,3 +505,15 @@ def superread_scatter_data(superread_path, output_csv):
         'weight': [sr['weight'] for sr in superreads],
         'vacs_length': [len(sr['vacs']) for sr in superreads],
     }).to_csv(output_csv)
+
+
+def read_statistics(input_bam, output_csv):
+    mapping_qualities = []
+    query_lengths = []
+    for read in pysam.AlignmentFile(input_bam).fetch():
+        mapping_qualities.append(read.mapping_quality)
+        query_lengths.append(read.qlen)
+    pd.DataFrame({
+        'mapping_qualities': mapping_qualities,
+        'query_lengths': query_lengths
+    }).to_csv(output_csv)
