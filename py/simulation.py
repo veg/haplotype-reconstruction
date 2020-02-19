@@ -151,8 +151,9 @@ def get_mate(
 
 def write_ar_dataset(
         lanl_ids, frequencies, ar, aligned_genomes, output_fastq,
-        number_of_reads
+        number_of_reads, inflate1=None, inflate2=None
         ):
+    should_recombine = len(lanl_ids) > 1
     sams = [
         list(pysam.AlignmentFile('output/lanl/%s/wgs.sam' % lanl_id, "r"))
         for lanl_id in lanl_ids
@@ -168,27 +169,30 @@ def write_ar_dataset(
         number_of_clean_reads, 2*number_of_ar_reads, replace=False
     )
     ar_right_strains = np.zeros(2*number_of_ar_reads, dtype=np.int)
-    for i in range(number_of_strains):
-        other_strains = [j for j in range(number_of_strains) if j != i]
-        new_frequencies = np.array([frequencies[j] for j in other_strains])
-        new_frequencies = new_frequencies/np.sum(new_frequencies)
-        is_current_strain = ar_left_strains == i
+    if should_recombine:
+        for i in range(number_of_strains):
+            other_strains = [j for j in range(number_of_strains) if j != i]
+            new_frequencies = np.array([frequencies[j] for j in other_strains])
+            new_frequencies = new_frequencies/np.sum(new_frequencies)
+            is_current_strain = ar_left_strains == i
 
-        number_of_current_strain = is_current_strain.sum()
-        ar_right_strains[ar_left_strains == i] = np.random.choice(
-            other_strains, number_of_current_strain, p=new_frequencies
-        )
+            number_of_current_strain = is_current_strain.sum()
+            ar_right_strains[ar_left_strains == i] = np.random.choice(
+                other_strains, number_of_current_strain, p=new_frequencies
+            )
 
-    reference_to_alignment_maps = [
-        get_reference_to_alignment_map(lanl_id, aligned_genomes)
-        for lanl_id in lanl_ids
-    ]
+        reference_to_alignment_maps = [
+            get_reference_to_alignment_map(lanl_id, aligned_genomes)
+            for lanl_id in lanl_ids
+        ]
 
-    alignment_to_reference_maps = [
-        get_alignment_to_reference_map(lanl_id, aligned_genomes)
-        for lanl_id in lanl_ids
-    ]
-    with open(output_fastq, 'w') as output_file:
+        alignment_to_reference_maps = [
+            get_alignment_to_reference_map(lanl_id, aligned_genomes)
+            for lanl_id in lanl_ids
+        ]
+    total_unsuitable = 0
+    output_file = open(output_fastq, 'w')
+    if should_recombine:
         i = 0
         for _ in range(number_of_ar_reads):
             found = False
@@ -204,6 +208,8 @@ def write_ar_dataset(
                 i += 1
                 if right_read_index is not None:
                     found = True
+                else:
+                    total_unsuitable += 1
             right_read = sams[right_strain][right_read_index]
 
             left_aligned_pairs = left_read.get_aligned_pairs(matches_only=True)
@@ -253,19 +259,20 @@ def write_ar_dataset(
             quality = left_quality + right_quality
             output_file.write(quality + '\n')
 
-        nonrecombined_strains = np.random.choice(
-            number_of_strains, number_of_clean_reads, p=frequencies
-        )
-        nonrecombined_indices = np.random.choice(
-            number_of_reads, number_of_clean_reads, replace=False
-        )
-        for strain, index in zip(nonrecombined_strains, nonrecombined_indices):
-            read = sams[strain][index]
-            output_file.write('@' + read.query_name + '\n')
-            output_file.write(read.query + '\n')
-            output_file.write('+\n')
-            output_file.write(read.qual + '\n')
-
+    nonrecombined_strains = np.random.choice(
+        number_of_strains, number_of_clean_reads, p=frequencies
+    )
+    nonrecombined_indices = np.random.choice(
+        number_of_reads, number_of_clean_reads, replace=False
+    )
+    for strain, index in zip(nonrecombined_strains, nonrecombined_indices):
+        read = sams[strain][index]
+        output_file.write('@' + read.query_name + '\n')
+        output_file.write(read.query + '\n')
+        output_file.write('+\n')
+        output_file.write(read.qual + '\n')
+    print('Total unsuitable reads:', total_unsuitable)
+    output_file.close()
 
 def simulation_truth(dataset, output_fasta):
     with open('simulations.json') as json_file:
