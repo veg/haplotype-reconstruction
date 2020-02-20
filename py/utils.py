@@ -517,3 +517,17 @@ def read_statistics(input_bam, output_csv):
         'mapping_qualities': mapping_qualities,
         'query_lengths': query_lengths
     }).to_csv(output_csv)
+
+
+def pluck_superread_reads(input_json, superread_index, input_bam, output_bam):
+    with open(input_json) as json_file:
+        superreads = json.load(json_file)
+    read_names = superreads[superread_index]['read_names']
+    query_hash = { query: True for query in read_names }
+    af_in = pysam.AlignmentFile(input_bam, 'rb')
+    af_out = pysam.AlignmentFile(output_bam, 'wb', template=af_in)
+    for read in af_in.fetch():
+        if read.query_name in query_hash:
+            af_out.write(read)
+    af_in.close()
+    af_out.close()
