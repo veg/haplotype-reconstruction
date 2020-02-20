@@ -27,6 +27,7 @@ SRA = [
   "SRX3661447"
 ]
 FVM_RECORDS = ['89_6', 'HXB2', 'JRCSF', 'NL43', 'YU2']
+FVM_STRING = 'FiveVirusMix'
 ALL_DATASETS = ACCESSION_NUMBERS + SIMULATED_DATASETS + RECONSTRUCTION_DATASETS
 KNOWN_TRUTH = SIMULATED_DATASETS + ["FiveVirusMixIllumina_1"]
 ALL_REFERENCES = ["env", "rev", "vif", "pol", "prrt", "rt", "pr", "gag", "int", "tat"] # + ["nef", "vpr"] 
@@ -586,7 +587,7 @@ rule readreduce:
 # ACME haplotype reconstruction
 
 def true_sequences_input(wildcards):
-  if wildcards.known_dataset == 'FiveVirusMixIllumina_1':
+  if wildcards.known_dataset[:len(FVM_STRING)] == FVM_STRING:
     return "input/5VM.fasta"
   dataset = wildcards.known_dataset.split('_')[0]
   return "output/truth/%s/genomes.fasta" % dataset
@@ -620,7 +621,7 @@ rule true_covarying_sites:
 
 def covarying_truth_comparison_input(wildcards):
     dataset = wildcards.dataset
-    if dataset != 'FiveVirusMixIllumina_1':
+    if dataset[:len(FVM_STRING)] != FVM_STRING:
       known_dataset = dataset.split('_')[0]
     else:
       known_dataset = dataset
@@ -673,14 +674,25 @@ rule superread_scatter_plot:
   script:
     "R/superread_scatterplot.R"
 
+def truth_at_cvs_input(wildcards):
+  dataset = wildcards.dataset
+  if dataset[:len(FVM_STRING)] != FVM_STRING:
+    known_dataset = dataset.split('_')[0]
+  else:
+    known_dataset = dataset
+  computed_string = "output/%s/%s/%s/%s/acme/covarying_sites.json"
+  computed_arguments = (dataset, wildcards.qc, wildcards.read_mapper, wildcards.reference)
+  computed = computed_string % computed_arguments
+  truth = "output/truth/%s/%s_gene.fasta" % (known_dataset, wildcards.reference)
+  return [truth, computed]
+
 rule truth_at_cvs:
   input:
-    cvs=rules.covarying_sites.output[0],
-    fasta=rules.true_sequences.output.fasta
+    truth_at_cvs_input
   output:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/truth-cvs.fasta"
   run:
-    restrict_fasta_to_cvs(input.fasta, input.cvs, output[0])
+    restrict_fasta_to_cvs(input[0], input[1], output[0])
 
 rule truth_and_superreads_cvs:
   input:
