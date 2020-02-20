@@ -654,9 +654,13 @@ rule superread_fasta:
     cvs=rules.covarying_sites.output[0],
     sr=rules.superreads.output[0]
   output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/superreads.fasta"
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/superreads_wf-{weight_filter}_vf-{vacs_filter}.fasta"
   run:
-    superread_fasta_io(input.cvs, input.sr, output[0])
+    superread_fasta_io(
+      input.cvs, input.sr, output[0],
+      weight_filter=int(wildcards.weight_filter),
+      vacs_filter=int(wildcards.vacs_filter)
+    )
 
 rule superread_scatter_data:
   input:
@@ -699,7 +703,7 @@ rule truth_and_superreads_cvs:
     truth=rules.truth_at_cvs.output[0],
     superreads=rules.superread_fasta.output[0]
   output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/truth-sr-cvs.fasta"
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/truth-sr-cvs_wf-{weight_filter}_vf-{vacs_filter}.fasta"
   shell:
     "cat {input.truth} {input.superreads} > {output}"
 
