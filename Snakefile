@@ -34,6 +34,7 @@ ALL_REFERENCES = ["env", "rev", "vif", "pol", "prrt", "rt", "pr", "gag", "int", 
 REFERENCE_SUBSET = ["env", "pol", "gag"]
 HYPHY_PATH = "/Users/stephenshank/Software/lib/hyphy"
 HAPLOTYPERS = ["abayesqr", "savage", "regress_haplo", "quasirecomb"]
+NUMBER_OF_READS = 100000
 
 wildcard_constraints:
   dataset="[^/]+",
@@ -162,9 +163,9 @@ rule simulation:
     "envs/ngs.yml"
   shell:
     """
-      art_illumina -rs 1 -ss HS25 --samout -i {input} -l 120 -s 50 -c 1500000 -o {params.out}
+      art_illumina -rs 1 -ss HS25 --samout -i {input} -l 50 -s 50 -c %d -o {params.out}
       mv {params.out}.fq {output.fastq}
-    """
+    """ % NUMBER_OF_READS
 
 def simulation_truth_input(wildcards):
   dataset = SIMULATION_INFORMATION[wildcards.simulated_dataset]
@@ -205,7 +206,8 @@ rule simulate_wgs_dataset:
     json="output/sim-{simulated_dataset}_ar-{ar}_seed-{seed}/simulation_quality.json"
   run:
     simulate_wgs_dataset(
-      wildcards.simulated_dataset, wildcards.ar, input.fasta, output.fastq, output.json, wildcards.seed
+      wildcards.simulated_dataset, wildcards.ar, input.fasta, output.fastq, output.json,
+      wildcards.seed, NUMBER_OF_READS
     )
 
 # Situating other data
@@ -682,7 +684,7 @@ rule inspect_superread:
   input:
     bam="output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.bam",
     superreads=rules.superreads.output[0],
-    reference=rules.situate_references.output[0]
+    reference=rules.true_sequences.output.fasta
   output:
     bam="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/sr-{sr}/sorted.bam",
     fasta="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/sr-{sr}/sorted.fasta",
