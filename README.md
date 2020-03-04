@@ -19,6 +19,7 @@ This repo can be used to test a variety of tools and settings to build pipelines
 | PredictHaplo | No | [Link](https://ieeexplore.ieee.org/document/6661314) | [Link](https://bmda.dmi.unibas.ch/software.html) |
 | QSdpR | No | [Link](https://www.sciencedirect.com/science/article/pii/S0888754317301568) | [Link](https://sourceforge.net/projects/qsdpr/) |
 | TenSQR | No | [Link](https://academic.oup.com/bioinformatics/article/34/13/i23/5045739) | [Link](https://github.com/SoYeonA/TenSQR) |
+| HaROLD | No | [Link](https://www.biorxiv.org/content/10.1101/444877v1.full.pdf) | [Link](https://github.com/RichardAGoldstein/HaROLD) |
 
 A standard invocation will be of the form:
 
