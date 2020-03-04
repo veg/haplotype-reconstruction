@@ -163,7 +163,7 @@ rule simulation:
     "envs/ngs.yml"
   shell:
     """
-      art_illumina -rs 1 -ss HS25 --samout -i {input} -l 50 -s 50 -c %d -o {params.out}
+      art_illumina -rs 1 -ss HS25 --samout -i {input} -l 120 -s 50 -c %d -o {params.out}
       mv {params.out}.fq {output.fastq}
     """ % NUMBER_OF_READS
 
@@ -709,6 +709,15 @@ rule inspect_superread:
     pluck_superread_reads(input[1], int(wildcards.sr), input[0], output.bam)
     shell("bam2msa {output.bam} {output.fasta}")
     shell("cat {input[2]} {output.fasta} > {output.ref}")
+
+rule inspect_superread_at_cvs:
+  input:
+    superread=rules.inspect_superread.output.ref,
+    covarying_sites=rules.covarying_sites.output.json
+  output:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/sr-{sr}/sorted-ref-cvs.fasta"
+  run:
+    restrict_fasta_to_cvs(input.superread, input.covarying_sites, output[0])
 
 def truth_at_cvs_input(wildcards):
   dataset = wildcards.dataset
