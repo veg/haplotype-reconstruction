@@ -191,13 +191,13 @@ def extract_truth(
         json.dump(pairwise_distances, json_file, indent=2)
 
 def covarying_truth(
-        input_computed, input_actual, input_reference, output_json
+        input_computed, input_truth, input_reference, output_json
         ):
     reference = SeqIO.read(input_reference, 'fasta')
     rl = len(reference.seq)
     with open(input_computed) as input_file:
         cvs = json.load(input_file)
-    with open(input_actual) as input_file:
+    with open(input_truth) as input_file:
         true_cvs = json.load(input_file)
 
     tp = []
@@ -577,7 +577,7 @@ def quantify_ar(input_fasta, superread_path, output_json_path):
     ar_weighted=0
     for ar in ar_total:
         ar_weighted+=superread_json[ar]["weight"]
-    
+
     # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
     # Write json                                                              #
     # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
@@ -593,7 +593,7 @@ def quantify_ar(input_fasta, superread_path, output_json_path):
     with open(output_json_path, 'w') as fp:
         json.dump(to_write, fp, indent=2)
 
-## Merging multiple jsons (ex: multiple simulations); 
+## Merging multiple jsons (ex: multiple simulations);
 ## Input: Use one json with full json path and consolidate with similar ones
 def consolidate_jsons(input_json, output_csv_path):
     # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
@@ -622,3 +622,28 @@ def consolidate_jsons(input_json, output_csv_path):
                 with open(f,'r') as json_file:
                     cur_json=json.load(json_file)
                 writeFile.write(','.join([str(i) for i in [f,ar,s,cur_json[0]['quantify_ar']*100]])+'\n') # convert fraction to %
+                
+def read_statistics(input_bam, output_csv):
+    mapping_qualities = []
+    query_lengths = []
+    for read in pysam.AlignmentFile(input_bam).fetch():
+        mapping_qualities.append(read.mapping_quality)
+        query_lengths.append(read.qlen)
+    pd.DataFrame({
+        'mapping_qualities': mapping_qualities,
+        'query_lengths': query_lengths
+    }).to_csv(output_csv)
+
+
+def pluck_superread_reads(input_json, superread_index, input_bam, output_bam):
+    with open(input_json) as json_file:
+        superreads = json.load(json_file)
+    read_names = superreads[superread_index]['read_names']
+    query_hash = { query: True for query in read_names }
+    af_in = pysam.AlignmentFile(input_bam, 'rb')
+    af_out = pysam.AlignmentFile(output_bam, 'wb', template=af_in)
+    for read in af_in.fetch():
+        if read.query_name in query_hash:
+            af_out.write(read)
+    af_in.close()
+    af_out.close()

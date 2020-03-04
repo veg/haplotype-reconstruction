@@ -27,12 +27,14 @@ SRA = [
   "SRX3661447"
 ]
 FVM_RECORDS = ['89_6', 'HXB2', 'JRCSF', 'NL43', 'YU2']
+FVM_STRING = 'FiveVirusMix'
 ALL_DATASETS = ACCESSION_NUMBERS + SIMULATED_DATASETS + RECONSTRUCTION_DATASETS
 KNOWN_TRUTH = SIMULATED_DATASETS + ["FiveVirusMixIllumina_1"]
 ALL_REFERENCES = ["env", "rev", "vif", "pol", "prrt", "rt", "pr", "gag", "int", "tat"] # + ["nef", "vpr"] 
 REFERENCE_SUBSET = ["env", "pol", "gag"]
 HYPHY_PATH = "/Users/stephenshank/Software/lib/hyphy"
 HAPLOTYPERS = ["abayesqr", "savage", "regress_haplo", "quasirecomb"]
+NUMBER_OF_READS = 300000
 
 wildcard_constraints:
   dataset="[^/]+",
@@ -161,9 +163,9 @@ rule simulation:
     "envs/ngs.yml"
   shell:
     """
-      art_illumina -rs 1 -ss HS25 --samout -i {input} -l 120 -s 50 -c 1500000 -o {params.out}
+      art_illumina -rs 1 -ss HS25 --samout -i {input} -l 120 -s 50 -c %d -o {params.out}
       mv {params.out}.fq {output.fastq}
-    """
+    """ % NUMBER_OF_READS
 
 def simulation_truth_input(wildcards):
   dataset = SIMULATION_INFORMATION[wildcards.simulated_dataset]
@@ -204,7 +206,8 @@ rule simulate_wgs_dataset:
     json="output/sim-{simulated_dataset}_ar-{ar}_seed-{seed}/simulation_quality.json"
   run:
     simulate_wgs_dataset(
-      wildcards.simulated_dataset, wildcards.ar, input.fasta, output.fastq, output.json, wildcards.seed
+      wildcards.simulated_dataset, wildcards.ar, input.fasta, output.fastq, output.json,
+      wildcards.seed, NUMBER_OF_READS
     )
 
 # Situating other data
@@ -407,6 +410,14 @@ rule sort_and_index:
       samtools index {output.bam}
     """
 
+rule read_statistics:
+  input:
+    rules.sort_and_index.output.bam
+  output:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/stats.csv"
+  run:
+    read_statistics(input[0], output[0])
+
 rule sorted_fasta:
   input:
     rules.sort_and_index.output.bam
@@ -578,9 +589,9 @@ rule readreduce:
 # ACME haplotype reconstruction
 
 def true_sequences_input(wildcards):
-  if wildcards.dataset == 'FiveVirusMixIllumina_1':
+  if wildcards.known_dataset[:len(FVM_STRING)] == FVM_STRING:
     return "input/5VM.fasta"
-  dataset = wildcards.dataset.split('_')[0]
+  dataset = wildcards.known_dataset.split('_')[0]
   return "output/truth/%s/genomes.fasta" % dataset
 
 rule true_sequences:
@@ -588,10 +599,10 @@ rule true_sequences:
     wgs=true_sequences_input,
     reference=rules.situate_references.output[0]
   output:
-    fasta="output/truth/{dataset}/{reference}_gene.fasta",
-    json="output/truth/{dataset}/{reference}_gene.json"
+    fasta="output/truth/{known_dataset}/{reference}_gene.fasta",
+    json="output/truth/{known_dataset}/{reference}_gene.json"
   run:
-    extract_truth(input.wgs, input.reference, wildcards.dataset, wildcards.reference, output.fasta, output.json)
+    extract_truth(input.wgs, input.reference, wildcards.known_dataset, wildcards.reference, output.fasta, output.json)
 
 rule covarying_sites:
   input:
@@ -601,6 +612,35 @@ rule covarying_sites:
     fasta="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/consensus.fasta"
   run:
     covarying_sites_io(input[0], output.json, output.fasta)
+
+rule true_covarying_sites:
+  input:
+    rules.true_sequences.output.fasta
+  output:
+    "output/truth/{known_dataset}/{reference}_covarying_sites.json"
+  run:
+    covarying_sites(input[0], output[0])
+
+def covarying_truth_comparison_input(wildcards):
+    dataset = wildcards.dataset
+    if dataset[:len(FVM_STRING)] != FVM_STRING:
+      known_dataset = dataset.split('_')[0]
+    else:
+      known_dataset = dataset
+    computed_string = "output/%s/%s/%s/%s/acme/covarying_sites.json"
+    computed_arguments = (dataset, wildcards.qc, wildcards.read_mapper, wildcards.reference)
+    computed = computed_string % computed_arguments
+    truth = "output/truth/%s/%s_covarying_sites.json" % (known_dataset, wildcards.reference)
+    reference = "output/references/%s.fasta" % wildcards.reference
+    return [computed, truth, reference]
+
+rule covarying_truth_comparison:
+  input:
+    covarying_truth_comparison_input
+  output:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/covarying_truth.json"
+  run:
+    covarying_truth(input[0], input[1], input[2], output[0])
 
 rule superreads:
   input:
@@ -616,9 +656,13 @@ rule superread_fasta:
     cvs=rules.covarying_sites.output[0],
     sr=rules.superreads.output[0]
   output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/superreads.fasta"
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/superreads_wf-{weight_filter}_vf-{vacs_filter}.fasta"
   run:
-    superread_fasta_io(input.cvs, input.sr, output[0])
+    superread_fasta_io(
+      input.cvs, input.sr, output[0],
+      weight_filter=int(wildcards.weight_filter),
+      vacs_filter=int(wildcards.vacs_filter)
+    )
 
 rule superread_scatter_data:
   input:
@@ -636,21 +680,71 @@ rule superread_scatter_plot:
   script:
     "R/superread_scatterplot.R"
 
+
+def inspect_superread_input(wildcards):
+    dataset = wildcards.dataset
+    if dataset[:len(FVM_STRING)] != FVM_STRING:
+      known_dataset = dataset.split('_')[0]
+    else:
+      known_dataset = dataset
+    bam_string = "output/%s/%s/%s/%s/sorted.bam"
+    bam_arguments = (dataset, wildcards.qc, wildcards.read_mapper, wildcards.reference)
+    bam = bam_string % bam_arguments
+    truth = "output/truth/%s/%s_gene.fasta" % (known_dataset, wildcards.reference)
+    sr_string = "output/%s/%s/%s/%s/acme/superreads.json"
+    sr_arguments = (dataset, wildcards.qc, wildcards.read_mapper, wildcards.reference)
+    superreads = sr_string % sr_arguments
+    truth = "output/references/%s.fasta" % wildcards.reference
+    return [bam, superreads, truth]
+
+
+rule inspect_superread:
+  input:
+    inspect_superread_input
+  output:
+    bam="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/sr-{sr}/sorted.bam",
+    fasta="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/sr-{sr}/sorted.fasta",
+    ref="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/sr-{sr}/sorted-ref.fasta"
+  run:
+    pluck_superread_reads(input[1], int(wildcards.sr), input[0], output.bam)
+    shell("bam2msa {output.bam} {output.fasta}")
+    shell("cat {input[2]} {output.fasta} > {output.ref}")
+
+rule inspect_superread_at_cvs:
+  input:
+    superread=rules.inspect_superread.output.ref,
+    covarying_sites=rules.covarying_sites.output.json
+  output:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/sr-{sr}/sorted-ref-cvs.fasta"
+  run:
+    restrict_fasta_to_cvs(input.superread, input.covarying_sites, output[0])
+
+def truth_at_cvs_input(wildcards):
+  dataset = wildcards.dataset
+  if dataset[:len(FVM_STRING)] != FVM_STRING:
+    known_dataset = dataset.split('_')[0]
+  else:
+    known_dataset = dataset
+  computed_string = "output/%s/%s/%s/%s/acme/covarying_sites.json"
+  computed_arguments = (dataset, wildcards.qc, wildcards.read_mapper, wildcards.reference)
+  computed = computed_string % computed_arguments
+  truth = "output/truth/%s/%s_gene.fasta" % (known_dataset, wildcards.reference)
+  return [truth, computed]
+
 rule truth_at_cvs:
   input:
-    cvs=rules.covarying_sites.output[0],
-    fasta=rules.true_sequences.output.fasta
+    truth_at_cvs_input
   output:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/truth-cvs.fasta"
   run:
-    restrict_fasta_to_cvs(input.fasta, input.cvs, output[0])
+    restrict_fasta_to_cvs(input[0], input[1], output[0])
 
 rule truth_and_superreads_cvs:
   input:
     truth=rules.truth_at_cvs.output[0],
     superreads=rules.superread_fasta.output[0]
   output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/truth-sr-cvs.fasta"
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/truth-sr-cvs_wf-{weight_filter}_vf-{vacs_filter}.fasta"
   shell:
     "cat {input.truth} {input.superreads} > {output}"
 
@@ -683,31 +777,23 @@ rule reduced_superread_graph:
   input:
     rules.superreads.output[0],
   output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/graph-reduced_mw-{mw}_wp-{wp}_ek-{ek}.json"
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/graph-reduced.json"
   run:
-    graph_io(
-      input[0], output[0], 'reduced',
-      weight_percentile_cutoff=int(wildcards.wp)/100,
-      minimum_weight=int(wildcards.mw), edge_key=wildcards.ek
-    )
+    graph_io(input[0], output[0], 'reduced')
 
 rule incremental_superread_graph:
   input:
     rules.superreads.output[0],
   output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/graph-incremental_mw-{mw}_wp-{wp}_ek-{ek}.json"
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/graph-incremental.json"
   run:
-    graph_io(
-      input[0], output[0], 'incremental',
-      weight_percentile_cutoff=int(wildcards.wp)/100,
-      minimum_weight=int(wildcards.mw), edge_key=wildcards.ek
-    )
+    graph_io(input[0], output[0], 'incremental')
 
 rule candidates:
   input:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/graph-{graph_type}_mw-{mw}_wp-{wp}_ek-{ek}.json",
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/graph-{graph_type}.json",
   output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/describing-{graph_type}_mw-{mw}_wp-{wp}_ek-{ek}.json"
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/describing-{graph_type}.json"
   run:
     candidates_io(input[0], output[0])
 
@@ -718,7 +804,7 @@ rule regression:
     consensus=rules.covarying_sites.output.fasta,
     covarying_sites=rules.covarying_sites.output.json
   output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/haplotypes-{graph_type}_mw-{mw}_wp-{wp}_ek-{ek}.fasta"
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/haplotypes-{graph_type}.fasta"
   run:
     regression_io(
       input.superreads, input.describing, input.consensus,
@@ -727,7 +813,7 @@ rule regression:
 
 rule chosen_approach:
   input:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/haplotypes-reduced_mw-5_wp-50_ek-overlap.fasta"
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/haplotypes-reduced.fasta"
   output:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/haplotypes.fasta"
   shell:
@@ -776,32 +862,6 @@ def reference_input(wildcards):
     dataset = wildcards.dataset
   parameters = (dataset, wildcards.reference)
   return format_string % parameters
-
-rule haplotypes_and_truth_with_parameters:
-  input:
-    haplotypes=rules.regression.output[0],
-    truth=reference_input
-  output:
-    unaligned="output/{dataset}/{qc}/{read_mapper}/{reference}/{haplotyper}/truth_and_haplotypes_unaligned-{graph_type}_mw-{mw}_wp-{wp}_ek-{ek}.fasta",
-    aligned="output/{dataset}/{qc}/{read_mapper}/{reference}/{haplotyper}/truth_and_haplotypes-{graph_type}_mw-{mw}_wp-{wp}_ek-{ek}.fasta",
-    progress=os.getcwd()+"/output/{dataset}/{qc}/{read_mapper}/{reference}/{haplotyper}/progresst-{graph_type}_mw-{mw}_wp-{wp}_ek-{ek}.txt",
-    csv="output/{dataset}/{qc}/{read_mapper}/{reference}/{haplotyper}/truth_and_haplotypes-{graph_type}_mw-{mw}_wp-{wp}_ek-{ek}.csv",
-    json="output/{dataset}/{qc}/{read_mapper}/{reference}/{haplotyper}/truth_and_haplotypes-{graph_type}_mw-{mw}_wp-{wp}_ek-{ek}.json"
-  run:
-    shell("cat {input.haplotypes} {input.truth} > {output.unaligned}")
-    shell("mafft --progress {output.progress} {output.unaligned} > {output.aligned}")
-    pairwise_distance_csv(output.aligned, output.csv)
-    result_json(output.csv, output.json)
-
-rule haplotypes_and_truth_heatmap_with_parameters:
-  input:
-    rules.haplotypes_and_truth_with_parameters.output.csv
-  output:
-    png="output/{dataset}/{qc}/{read_mapper}/{reference}/{haplotyper}/truth_and_haplotypes-{graph_type}_mw-{mw}_wp-{wp}_ek-{ek}.png"
-  conda:
-    "envs/R.yml"
-  script:
-    "R/truth_heatmap.R"
 
 rule haplotypes_and_truth:
   input:
