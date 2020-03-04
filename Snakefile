@@ -748,6 +748,23 @@ rule truth_and_superreads_cvs:
   shell:
     "cat {input.truth} {input.superreads} > {output}"
 
+rule quantify_ar:
+  input:
+    fasta=rules.truth_at_cvs.output[0],
+    json=rules.superreads.output[0]
+  output:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/truth-sr-cvs.json"
+  run:
+    quantify_ar(input[0], input[1], output[0])
+
+rule consolidate_sim_quantify_ar:
+  input:
+    json=rules.quantify_ar.output[0]
+  output:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/similar_consolidated.csv"
+  run:
+    consolidate_simjsons(input[0], output[0])
+
 rule superread_graph:
   input:
     rules.superreads.output[0],
@@ -973,4 +990,3 @@ rule tree:
     "output/evolution/{qc}/{read_mapper}/{reference}/{haplotyper}/tree.new"
   shell:
     "FastTree -nt {input} > {output}"
-

@@ -507,6 +507,122 @@ def superread_scatter_data(superread_path, output_csv):
     }).to_csv(output_csv)
 
 
+## HK getProportionAr_5.py
+def quantify_ar(input_fasta, superread_path, output_json_path):
+    # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+    # Call files                                                              #
+    # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+
+    ## Get all reference sequences
+    refNames=[]
+    refs=[]
+    with open(input_fasta,'r') as myFile:
+        for l in myFile:
+            if l.startswith('>') and l.startswith('>superread')==False:
+                refNames.append(l.rstrip().lstrip('>'))
+                refs.append('')
+            elif l.startswith('>superread'): break
+            else: refs[-1]+=l.rstrip()
+
+    ## Get json file where I can get: superread sequence, indices, and weights
+    with open(superread_path,'r') as json_file:
+        superread_json=json.load(json_file)
+
+    # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+    # Obtain superreads with clear evidence of AR                             #
+    # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+    ## Get recombined vs nonrecombined
+    ar_total=set() # clear evidence of artificial recombination
+    identical_total=set() # entire fragments exactly from ref
+    misc_total=set() # either all nt mutated or all from other strain
+    superreads=[]
+    for ref in refs:
+        ar_bin=[]
+        identical_bin=[]
+        misc_bin=[]
+        ## Iterate over superread_json
+        for superread_info in superread_json:
+            ## Extract variables
+            superreads.append(superread_info["index"])
+            current_sr=superread_info["index"]
+            myRead=superread_info["vacs"]
+            first_ind=superread_info["cv_start"]
+            last_ind_p1=superread_info["cv_end"]
+            refFrag=ref[first_ind:last_ind_p1]
+            if myRead==refFrag: identical_bin.append(current_sr)
+            else:
+                indSubseq_ends=set(['_'.join([str(j) for j in [0,i]]) for i in range(1,len(refFrag)+1)])
+                indSubseq_ends=indSubseq_ends|set(['_'.join([str(j) for j in [i,len(refFrag)]]) for i in range(0,len(refFrag)+1)])
+                indSubseq_ends=indSubseq_ends-{'_'.join([str(j) for j in [0,len(refFrag)]]),'_'.join([str(j) for j in [len(refFrag),len(refFrag)]])}
+                indSubseq_ends=sorted([[int(j) for j in i.split('_')] for i in indSubseq_ends])
+                isOverlap=False
+                for ends in indSubseq_ends:
+                    if refFrag[ends[0]:ends[1]]==myRead[ends[0]:ends[1]]:
+                        isOverlap=True
+                if isOverlap: ar_bin.append(current_sr)
+                else: misc_bin.append(current_sr)
+        ar_total=ar_total|set(ar_bin)
+        identical_total=identical_total|set(identical_bin)
+        misc_total=misc_total|set(misc_bin)
+    ## Remove potential set intersects
+    ar_total=ar_total-identical_total
+    misc_total=misc_total-identical_total-ar_total
+
+    # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+    # Add weights to AR superreads                                            #
+    # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+    superreads_count_weights=0
+    for item in superread_json:
+        superreads_count_weights+=item["weight"]
+    ar_weighted=0
+    for ar in ar_total:
+        ar_weighted+=superread_json[ar]["weight"]
+
+    # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+    # Write json                                                              #
+    # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+    to_write = [{ "fasta_name": input_fasta, \
+                 "json_name": superread_path, \
+                 "quantify_ar": ar_weighted/superreads_count_weights, \
+                 "ar_weighted": ar_weighted, \
+                 "superreads_tot_weighted": superreads_count_weights, \
+                 "superreads_unweighted_length": len(superreads), \
+                 "ar_unweighted_length": len(ar_total), \
+                 "ar_indices": sorted(list(ar_total))
+                 }]
+    with open(output_json_path, 'w') as fp:
+        json.dump(to_write, fp, indent=2)
+
+## Merging multiple jsons (ex: multiple simulations);
+## Input: Use one json with full json path and consolidate with similar ones
+def consolidate_simjsons(input_json, output_csv_path):
+    # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+    # Get json files                                                          #
+    # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+    input_json_split=input_json.split('/')
+    diff_path_ind=[ind for ind in range(len(input_json_split)) if input_json_split[ind].startswith('sim')][0]
+    dir_jsons=[]
+    if input_json.startswith('sim'):
+        dir_jsons=os.listdir()
+    else:
+        dir_jsons=os.listdir('/'.join(input_json_split[:diff_path_ind]))
+    dir_jsons=[f for f in dir_jsons if f.startswith(input_json_split[diff_path_ind].split('_')[0])]
+    dir_jsons=['/'.join(input_json_split[:diff_path_ind]+[f]+input_json_split[diff_path_ind+1:]) for f in dir_jsons]
+    dir_jsons=[f for f in dir_jsons if os.path.isfile(f)]
+
+    # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+    # Write csv                                                               #
+    # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+    with open(output_csv_path, 'w') as writeFile:
+            writeFile.write(','.join(['path','true_ar','seed','quantified_ar'])+'\n')
+            for f in dir_jsons:
+                f_info=f.split('/')[diff_path_ind]
+                ar=f_info.split('_')[1].split('-')[1]
+                s=f_info.split('_')[2].split('-')[1]
+                with open(f,'r') as json_file:
+                    cur_json=json.load(json_file)
+                writeFile.write(','.join([str(i) for i in [f,ar,s,cur_json[0]['quantify_ar']*100]])+'\n') # convert fraction to %
+                
 def read_statistics(input_bam, output_csv):
     mapping_qualities = []
     query_lengths = []
