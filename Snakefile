@@ -680,19 +680,35 @@ rule superread_scatter_plot:
   script:
     "R/superread_scatterplot.R"
 
+
+def inspect_superread_input(wildcards):
+    dataset = wildcards.dataset
+    if dataset[:len(FVM_STRING)] != FVM_STRING:
+      known_dataset = dataset.split('_')[0]
+    else:
+      known_dataset = dataset
+    bam_string = "output/%s/%s/%s/%s/sorted.bam"
+    bam_arguments = (dataset, wildcards.qc, wildcards.read_mapper, wildcards.reference)
+    bam = bam_string % bam_arguments
+    truth = "output/truth/%s/%s_gene.fasta" % (known_dataset, wildcards.reference)
+    sr_string = "output/%s/%s/%s/%s/acme/superreads.json"
+    sr_arguments = (dataset, wildcards.qc, wildcards.read_mapper, wildcards.reference)
+    superreads = sr_string % sr_arguments
+    truth = "output/references/%s.fasta" % wildcards.reference
+    return [bam, superreads, truth]
+
+
 rule inspect_superread:
   input:
-    bam="output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.bam",
-    superreads=rules.superreads.output[0],
-    reference=rules.true_sequences.output.fasta
+    inspect_superread_input
   output:
     bam="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/sr-{sr}/sorted.bam",
     fasta="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/sr-{sr}/sorted.fasta",
     ref="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/sr-{sr}/sorted-ref.fasta"
   run:
-    pluck_superread_reads(input.superreads, int(wildcards.sr), input.bam, output.bam)
+    pluck_superread_reads(input[1], int(wildcards.sr), input[0], output.bam)
     shell("bam2msa {output.bam} {output.fasta}")
-    shell("cat {input.reference} {output.fasta} > {output.ref}")
+    shell("cat {input[2]} {output.fasta} > {output.ref}")
 
 def truth_at_cvs_input(wildcards):
   dataset = wildcards.dataset
