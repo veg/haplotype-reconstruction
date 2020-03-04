@@ -595,7 +595,7 @@ def quantify_ar(input_fasta, superread_path, output_json_path):
 
 ## Merging multiple jsons (ex: multiple simulations);
 ## Input: Use one json with full json path and consolidate with similar ones
-def consolidate_jsons(input_json, output_csv_path):
+def consolidate_simjsons(input_json, output_csv_path):
     # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
     # Get json files                                                          #
     # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
@@ -607,7 +607,7 @@ def consolidate_jsons(input_json, output_csv_path):
     else:
         dir_jsons=os.listdir('/'.join(input_json_split[:diff_path_ind]))
     dir_jsons=[f for f in dir_jsons if f.startswith(input_json_split[diff_path_ind].split('_')[0])]
-    dir_jsons=['/'.join([f]+input_json_split[diff_path_ind+1:]) for f in dir_jsons]
+    dir_jsons=['/'.join(input_json_split[:diff_path_ind]+[f]+input_json_split[diff_path_ind+1:]) for f in dir_jsons]
     dir_jsons=[f for f in dir_jsons if os.path.isfile(f)]
 
     # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
