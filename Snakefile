@@ -663,6 +663,14 @@ rule quantify_ar:
   run:
     quantify_ar(input[0], input[1], output[0])
 
+rule consolidate_quantify_ar:
+  input:
+    json=rules.quantify_ar.output[0]
+  output:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/similar_consolidated.json"
+  run:
+    consolidate_jsons(input[0], output[0])
+
 rule superread_graph:
   input:
     rules.superreads.output[0],

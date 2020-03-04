@@ -593,3 +593,32 @@ def quantify_ar(input_fasta, superread_path, output_json_path):
     with open(output_json_path, 'w') as fp:
         json.dump(to_write, fp, indent=2)
 
+## Merging multiple jsons (ex: multiple simulations); 
+## Input: Use one json with full json path and consolidate with similar ones
+def consolidate_jsons(input_json, output_csv_path):
+    # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+    # Get json files                                                          #
+    # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+    input_json_split=input_json.split('/')
+    diff_path_ind=[ind for ind in range(len(input_json_split)) if input_json_split[ind].startswith('sim')][0]
+    dir_jsons=[]
+    if input_json.startswith('sim'):
+        dir_jsons=os.listdir()
+    else:
+        dir_jsons=os.listdir('/'.join(input_json_split[:diff_path_ind]))
+    dir_jsons=[f for f in dir_jsons if f.startswith(input_json_split[diff_path_ind].split('_')[0])]
+    dir_jsons=['/'.join([f]+input_json_split[diff_path_ind+1:]) for f in dir_jsons]
+    dir_jsons=[f for f in dir_jsons if os.path.isfile(f)]
+
+    # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+    # Write csv                                                               #
+    # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+    with open(output_csv_path, 'w') as writeFile:
+            writeFile.write(','.join(['path','true_ar','seed','quantified_ar'])+'\n')
+            for f in dir_jsons:
+                f_info=f.split('/')[diff_path_ind]
+                ar=f_info.split('_')[1].split('-')[1]
+                s=f_info.split('_')[2].split('-')[1]
+                with open(f,'r') as json_file:
+                    cur_json=json.load(json_file)
+                writeFile.write(','.join([str(i) for i in [f,ar,s,cur_json[0]['quantify_ar']*100]])+'\n') # convert fraction to %
