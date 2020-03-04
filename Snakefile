@@ -34,7 +34,7 @@ ALL_REFERENCES = ["env", "rev", "vif", "pol", "prrt", "rt", "pr", "gag", "int", 
 REFERENCE_SUBSET = ["env", "pol", "gag"]
 HYPHY_PATH = "/Users/stephenshank/Software/lib/hyphy"
 HAPLOTYPERS = ["abayesqr", "savage", "regress_haplo", "quasirecomb"]
-NUMBER_OF_READS = 100000
+NUMBER_OF_READS = 300000
 
 wildcard_constraints:
   dataset="[^/]+",
