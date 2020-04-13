@@ -22,10 +22,6 @@ RECONSTRUCTION_DATASETS = [
   "sergei1",
   "FiveVirusMixIllumina_1"
 ]
-SRA = [
-  "SRX3661402",
-  "SRX3661447"
-]
 FVM_RECORDS = ['89_6', 'HXB2', 'JRCSF', 'NL43', 'YU2']
 FVM_STRING = 'FiveVirusMix'
 ALL_DATASETS = ACCESSION_NUMBERS + SIMULATED_DATASETS + RECONSTRUCTION_DATASETS
@@ -224,7 +220,10 @@ rule sra_dataset:
   params:
     "output/sra"
   shell:
-    "fastq-dump --outdir {params[0]} {wildcards.sra_accession}"
+    """
+      prefetch {wildcards.sra_accession}
+      fasterq-dump --outdir {params[0]} {wildcards.sra_accession}
+    """
 
 def situate_input(wildcards):
   dataset = wildcards.dataset
