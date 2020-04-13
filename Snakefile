@@ -136,9 +136,15 @@ rule extract_lanl_genome:
   run:
     extract_lanl_genome(input[0], wildcards.lanl_id, output[0])
 
+rule extract_references:
+   output:
+     "output/references/reference_list.csv"
+   run:
+     extract_genbank_references(output[0])
+
 rule extract_gene:
   input:
-    reference="input/references/{gene}.fasta",
+    rules.extract_references.output[0],
     genome=rules.extract_lanl_genome.output[0]
   output:
     sam="output/lanl/{lanl_id}/{gene}/sequence.sam",
@@ -329,19 +335,6 @@ rule bealign:
     "envs/veg.yml"
   shell:
     "bealign -r {input.reference} -e 0.5 -m HIV_BETWEEN_F -D {output.discards} -R {input.qc} {output.bam}"
-
-def situate_reference_input(wildcards):
-  if wildcards.reference in FVM_RECORDS:
-    return "output/FiveVirusMixIllumina_1/%s.fasta" % wildcards.reference
-  return "input/references/%s.fasta" % wildcards.reference
-
-rule situate_references:
-  input:
-    situate_reference_input
-  output:
-    "output/references/{reference}.fasta"
-  shell:
-    "cp {input} {output}"
 
 rule bwa:
   input:
@@ -547,7 +540,7 @@ rule abayesqr:
 rule shorah:
   input:
     bam=rules.sort_and_index.output.bam,
-    reference=rules.situate_references.output[0]
+    reference="output/references/{reference}.fasta"
   output:
     fasta="output/{dataset}/{qc}/{read_mapper}/{reference}/shorah/haplotypes.fasta"
   params:
@@ -597,7 +590,7 @@ def true_sequences_input(wildcards):
 rule true_sequences:
   input:
     wgs=true_sequences_input,
-    reference=rules.situate_references.output[0]
+    reference="output/references/{reference}.fasta"
   output:
     fasta="output/truth/{known_dataset}/{reference}_gene.fasta",
     json="output/truth/{known_dataset}/{reference}_gene.json"

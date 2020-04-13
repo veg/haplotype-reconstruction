@@ -647,3 +647,44 @@ def pluck_superread_reads(input_json, superread_index, input_bam, output_bam):
             af_out.write(read)
     af_in.close()
     af_out.close()
+
+
+def extract_single_genbank(input_genbank):
+    genbank_path = os.path.join('input', 'references', input_genbank)
+    genbank_record = SeqIO.read(genbank_path, 'genbank')
+    virus = input_genbank.split('.')[0]
+    is_hiv = virus == 'hiv'
+    feature = 'gene' if not is_hiv else 'note'
+    genes = [
+        feature
+        for feature in genbank_record.features
+        if feature.type == 'gene' or feature.type == 'CDS'
+    ]
+    for gene in genes:
+        start = gene.location.start.position
+        end = gene.location.end.position
+        name = gene.qualifiers[feature][0].split()[0]
+        seq = gene.extract(genbank_record.seq)
+        if len(seq) % 3 == 0:
+            filename = 'output/references/%s-%s.fasta' % (virus, name)
+            fasta_record = SeqRecord(
+                seq,
+                id=name,
+                description=''
+            )
+            SeqIO.write(fasta_record, filename, 'fasta')
+    return [(virus, gene.qualifiers[feature][0]) for gene in genes]
+
+
+def extract_genbank_references(reference_csv):
+    reference_directory = os.path.join('input', 'references')
+    genbank_files = os.listdir(reference_directory)
+    reference_list = []
+    for genbank_file in genbank_files:
+        single_reference_list = extract_single_genbank(genbank_file)
+        reference_list.extend(single_reference_list)
+    with open(reference_csv, 'w', newline='') as csv_file:
+        writer = csv.writer(csv_file)
+        writer.writerow(('virus', 'gene'))
+        for reference in reference_list:
+            writer.writerow(reference)
