@@ -29,12 +29,29 @@ KNOWN_TRUTH = SIMULATED_DATASETS + ["FiveVirusMixIllumina_1"]
 ALL_REFERENCES = ["env", "rev", "vif", "pol", "prrt", "rt", "pr", "gag", "int", "tat"] # + ["nef", "vpr"] 
 REFERENCE_SUBSET = ["env", "pol", "gag"]
 HYPHY_PATH = "/Users/stephenshank/Software/lib/hyphy"
-HAPLOTYPERS = ["abayesqr", "savage", "regress_haplo", "quasirecomb"]
+HAPLOTYPERS = ["abayesqr", "regress_haplo", "quasirecomb", "acme"]
 NUMBER_OF_READS = 300000
-
+with open('input/sarscov2_accessions.txt') as sarscov2_accession_file:
+  SARSCOV2_ACCESSIONS = [
+    line.strip() for line in sarscov2_accession_file.readlines()
+  ]
+SARSCOV2_REFERENCES = [
+  filename.split('.')[0]
+  for filename in os.listdir('output/references')
+  if filename[:4] == 'sars'
+]
 wildcard_constraints:
   dataset="[^/]+",
   simulated_dataset="[^/]+"
+
+rule sarscov2:
+  input:
+    expand(
+      "output/{dataset}/trimmomatic/bowtie2/{reference}/{haplotyper}/haplotypes.fasta",
+      dataset=SARSCOV2_ACCESSIONS[:100],
+      reference=SARSCOV2_REFERENCES,
+      haplotyper=HAPLOTYPERS
+    )
 
 rule all_haplotypers:
   input:
@@ -515,7 +532,7 @@ rule savage:
 rule abayesqr_config:
   input:
     sam="output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.sam",
-    reference="input/references/{reference}.fasta"
+    reference="output/references/{reference}.fasta"
   output:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/abayesqr/config",
   run:
