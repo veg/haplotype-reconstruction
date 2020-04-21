@@ -235,11 +235,16 @@ rule sra_dataset:
   output:
     "output/sra/{sra_accession}.fastq"
   params:
-    "output/sra"
+    sra_dir="output/sra",
+    first_pair="output/sra/{sra_accession}_1.fastq",
+    second_pair="output/sra/{sra_accession}_2.fastq"
   shell:
     """
-      prefetch {wildcards.sra_accession}
-      fasterq-dump --outdir {params[0]} {wildcards.sra_accession}
+      prefetch -O output/sra {wildcards.sra_accession}
+      fasterq-dump --outdir {params.sra_dir} {wildcards.sra_accession}
+      if [ -f {params.first_pair} ]; then
+        cat {params.first_pair} {params.second_pair} > {output}
+      fi
     """
 
 def situate_input(wildcards):
