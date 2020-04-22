@@ -408,6 +408,15 @@ rule bowtie2_alignment:
       samtools view -Sb {output.sam} > {output.bam}
     """
 
+rule minimap2:
+  input:
+    reads="output/{dataset}/{qc}/qc.fastq",
+    reference="output/references/{reference}.fasta"
+  output:
+    "output/{dataset}/{qc}/minimap2/{reference}/mapped.bam"
+  shell:
+  	"minimap2 -a {input.reference} {input.reads} | samtools view -Sb > {output}"
+
 rule sort_and_index:
   input:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/mapped.bam"
