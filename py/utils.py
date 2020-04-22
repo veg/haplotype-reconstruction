@@ -623,16 +623,31 @@ def consolidate_simjsons(input_json, output_csv_path):
                     cur_json=json.load(json_file)
                 writeFile.write(','.join([str(i) for i in [f,ar,s,cur_json[0]['quantify_ar']*100]])+'\n') # convert fraction to %
                 
-def read_statistics(input_bam, output_csv):
+def read_statistics(input_bam, output_full, output_summary):
     mapping_qualities = []
     query_lengths = []
-    for read in pysam.AlignmentFile(input_bam).fetch():
+    for read in pysam.AlignmentFile(input_bam).fetch(until_eof=True):
         mapping_qualities.append(read.mapping_quality)
         query_lengths.append(read.qlen)
-    pd.DataFrame({
+    full = pd.DataFrame({
         'mapping_qualities': mapping_qualities,
-        'query_lengths': query_lengths
-    }).to_csv(output_csv)
+        'query_length': query_lengths
+    })
+
+    full.to_csv(output_full)
+    mq_value_counts = full.mapping_qualities.value_counts().sort_index()
+    mq_summary = pd.DataFrame({
+        'value': mq_value_counts.index,
+        'count': mq_value_counts.values,
+        'stat': 'mapping_quality'
+    })
+    ql_value_counts = full.query_length.value_counts().sort_index()
+    ql_summary = pd.DataFrame({
+        'value': ql_value_counts.index,
+        'count': ql_value_counts.values,
+        'stat': 'query_length'
+    })
+    pd.concat([mq_summary, ql_summary], axis=0).to_csv(output_summary, index=False)
 
 
 def pluck_superread_reads(input_json, superread_index, input_bam, output_bam):

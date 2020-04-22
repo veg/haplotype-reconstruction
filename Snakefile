@@ -426,11 +426,12 @@ rule sort_and_index:
 
 rule read_statistics:
   input:
-    rules.sort_and_index.output.bam
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/mapped.bam"
   output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/stats.csv"
+    full="output/{dataset}/{qc}/{read_mapper}/{reference}/read-stats.csv",
+    summary="output/{dataset}/{qc}/{read_mapper}/{reference}/read-stat-summary.csv"
   run:
-    read_statistics(input[0], output[0])
+    read_statistics(input[0], output.full, output.summary)
 
 rule sorted_fasta:
   input:
