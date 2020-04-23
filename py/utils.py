@@ -703,3 +703,13 @@ def extract_genbank_references(reference_csv):
         writer.writerow(('virus', 'gene'))
         for reference in reference_list:
             writer.writerow(reference)
+
+
+def filter_bam(input_bam_file, output_bam_file, mapping_cutoff=20):
+    input_bam = pysam.AlignmentFile(input_bam_file, "rb")
+    output_bam = pysam.AlignmentFile(output_bam_file, "wb", template=input_bam)
+    for read in input_bam.fetch(until_eof=True):
+        if read.mapping_quality >= mapping_cutoff:
+            output_bam.write(read)
+    input_bam.close()
+    output_bam.close()

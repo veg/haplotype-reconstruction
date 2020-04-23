@@ -417,9 +417,26 @@ rule minimap2:
   shell:
   	"minimap2 -a {input.reference} {input.reads} | samtools view -Sb > {output}"
 
-rule sort_and_index:
+rule read_statistics:
   input:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/mapped.bam"
+  output:
+    full="output/{dataset}/{qc}/{read_mapper}/{reference}/read-stats.csv",
+    summary="output/{dataset}/{qc}/{read_mapper}/{reference}/read-stat-summary.csv"
+  run:
+    read_statistics(input[0], output.full, output.summary)
+
+rule filter:
+  input:
+    bam="output/{dataset}/{qc}/{read_mapper}/{reference}/mapped.bam"
+  output:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/filtered.bam"
+  run:
+    filter_bam(input.bam, output[0])
+
+rule sort_and_index:
+  input:
+    rules.filter.output[0]
   output:
     bam="output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.bam",
     sam="output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.sam",
@@ -432,15 +449,6 @@ rule sort_and_index:
       samtools view -h {output.bam} > {output.sam}
       samtools index {output.bam}
     """
-
-rule read_statistics:
-  input:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/mapped.bam"
-  output:
-    full="output/{dataset}/{qc}/{read_mapper}/{reference}/read-stats.csv",
-    summary="output/{dataset}/{qc}/{read_mapper}/{reference}/read-stat-summary.csv"
-  run:
-    read_statistics(input[0], output.full, output.summary)
 
 rule sorted_fasta:
   input:
