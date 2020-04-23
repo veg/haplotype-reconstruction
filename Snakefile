@@ -460,6 +460,28 @@ rule sorted_fasta:
   shell:
     "bam2msa {input} {output}"
 
+rule deduplicated:
+  input:
+    rules.sort_and_index.output.bam
+  output:
+    bam="output/{dataset}/{qc}/{read_mapper}/{reference}/deduped.bam",
+    metrics="output/{dataset}/{qc}/{read_mapper}/{reference}/picard_metrics.txt"
+  shell:
+    """
+      picard MarkDuplicates \
+        I={input} O={output.bam} M={output.metrics} \
+        REMOVE_DUPLICATES=true ASSUME_SORTED=true
+    """
+
+rule realigned:
+  input:
+    bam=rules.deduplicated.output.bam,
+    reference=rules.bowtie2_index.input.reference
+  output:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/realigned.bam"
+  shell:
+    "lofreq viterbi -f {input.reference} -o {output} {input.bam}"
+
 rule qualimap:
   input:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.bam"
