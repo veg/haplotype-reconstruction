@@ -482,6 +482,15 @@ rule realigned:
   shell:
     "lofreq viterbi -f {input.reference} -o {output} {input.bam}"
 
+rule call_variants:
+  input:
+    bam=rules.realigned.output[0],
+    reference=rules.bowtie2_index.input.reference
+  output:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/variants.vcf"
+  shell:
+    "lofreq call -f {input.reference} -o {output} {input.bam}"
+
 rule qualimap:
   input:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.bam"
@@ -663,9 +672,10 @@ rule covarying_sites:
     rules.sort_and_index.output.bam
   output:
     json="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/covarying_sites.json",
-    fasta="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/consensus.fasta"
+    fasta="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/consensus.fasta",
+    covariation="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/covariation.csv"
   run:
-    covarying_sites_io(input[0], output.json, output.fasta)
+    covarying_sites_io(input[0], output.json, output.fasta, output.covariation)
 
 rule true_covarying_sites:
   input:
