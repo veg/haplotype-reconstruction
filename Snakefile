@@ -175,15 +175,22 @@ rule simulation:
     rules.extract_lanl_genome.output[0]
   output:
     fastq="output/lanl/{lanl_id}/wgs.fastq",
-    sam="output/lanl/{lanl_id}/wgs.sam"
+    sam="output/lanl/{lanl_id}/wgs.sam",
+    bam="output/lanl/{lanl_id}/wgs.bam",
+    sorted_bam="output/lanl/{lanl_id}/sorted.bam",
+    report="output/lanl/{lanl_id}/qualimapReport.html"
   params:
-    out="output/lanl/{lanl_id}/wgs"
+    out="output/lanl/{lanl_id}/wgs",
+    directory="output/lanl/{lanl_id}"
   conda:
     "envs/ngs.yml"
   shell:
     """
-      art_illumina -rs 1 -ss HS25 --samout -i {input} -l 120 -s 50 -c %d -o {params.out}
+      art_illumina -rs 1 -ss HS25 --samout -i {input} -l 140 -s 50 -c %d -o {params.out}
       mv {params.out}.fq {output.fastq}
+      samtools view -Sb {output.sam} > {output.bam}
+      samtools sort {output.bam} > {output.sorted_bam}
+      qualimap bamqc -bam {output.sorted_bam} -outdir {params.directory}
     """ % NUMBER_OF_READS
 
 def simulation_truth_input(wildcards):
@@ -436,7 +443,7 @@ rule filter:
 
 rule sort_and_index:
   input:
-    rules.filter.output[0]
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/mapped.bam"
   output:
     bam="output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.bam",
     sam="output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.sam",
@@ -651,6 +658,8 @@ rule readreduce:
 
 # ACME haplotype reconstruction
 
+WEIGHT_FILTER = 5
+
 def true_sequences_input(wildcards):
   if wildcards.known_dataset[:len(FVM_STRING)] == FVM_STRING:
     return "input/5VM.fasta"
@@ -675,7 +684,7 @@ rule covarying_sites:
     fasta="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/consensus.fasta",
     covariation="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/covariation.csv"
   run:
-    covarying_sites_io(input[0], output.json, output.fasta, output.covariation)
+    covarying_sites_io(input[0], output.json, output.fasta, output.covariation, threshold=.05)
 
 rule true_covarying_sites:
   input:
@@ -720,12 +729,10 @@ rule superread_fasta:
     cvs=rules.covarying_sites.output[0],
     sr=rules.superreads.output[0]
   output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/superreads_wf-{weight_filter}_vf-{vacs_filter}.fasta"
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/superreads.fasta"
   run:
     superread_fasta_io(
-      input.cvs, input.sr, output[0],
-      weight_filter=int(wildcards.weight_filter),
-      vacs_filter=int(wildcards.vacs_filter)
+      input.cvs, input.sr, output[0], weight_filter=WEIGHT_FILTER
     )
 
 rule superread_scatter_data:
@@ -783,6 +790,27 @@ rule inspect_superread_at_cvs:
   run:
     restrict_fasta_to_cvs(input.superread, input.covarying_sites, output[0])
 
+def sorted_fasta_and_truth_input(wildcards):
+  dataset = wildcards.dataset
+  if dataset[:len(FVM_STRING)] != FVM_STRING:
+    known_dataset = dataset.split('_')[0]
+  else:
+    known_dataset = dataset
+  computed_string = "output/%s/%s/%s/%s/sorted.fasta"
+  computed_arguments = (dataset, wildcards.qc, wildcards.read_mapper, wildcards.reference)
+  computed = computed_string % computed_arguments
+  truth = "output/truth/%s/%s_gene.fasta" % (known_dataset, wildcards.reference)
+  return [truth, computed]
+
+
+rule sorted_fasta_and_truth:
+  input:
+    sorted_fasta_and_truth_input
+  output:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/truth_and_sorted.fasta"
+  shell:
+    "cat {input[0]} {input[1]} > {output}"
+
 def truth_at_cvs_input(wildcards):
   dataset = wildcards.dataset
   if dataset[:len(FVM_STRING)] != FVM_STRING:
@@ -808,7 +836,7 @@ rule truth_and_superreads_cvs:
     truth=rules.truth_at_cvs.output[0],
     superreads=rules.superread_fasta.output[0]
   output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/truth-sr-cvs_wf-{weight_filter}_vf-{vacs_filter}.fasta"
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/truth-and-superreads.fasta"
   shell:
     "cat {input.truth} {input.superreads} > {output}"
 
@@ -843,7 +871,7 @@ rule reduced_superread_graph:
   output:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/graph-reduced.json"
   run:
-    graph_io(input[0], output[0], 'reduced')
+    graph_io(input[0], output[0], 'reduced', minimum_weight=WEIGHT_FILTER)
 
 rule incremental_superread_graph:
   input:

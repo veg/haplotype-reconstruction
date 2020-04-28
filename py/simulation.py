@@ -151,7 +151,7 @@ def get_mate(
 
 def write_ar_dataset(
         lanl_ids, frequencies, ar, aligned_genomes, output_fastq,
-        number_of_reads, inflate1=None, inflate2=None
+        number_of_reads
         ):
     should_recombine = len(lanl_ids) > 1
     sams = [
@@ -161,6 +161,8 @@ def write_ar_dataset(
     sam_infos = [get_sam_info(sam) for sam in sams]
     number_of_ar_reads = np.ceil(ar*number_of_reads).astype(np.int)
     number_of_clean_reads = number_of_reads - number_of_ar_reads
+    read_counts = (number_of_clean_reads, number_of_ar_reads)
+    print('Simulating %d pure reads, %d recombined...' % read_counts)
     number_of_strains = len(frequencies)
     ar_left_strains = np.random.choice(
         number_of_strains, 2*number_of_ar_reads, p=frequencies
