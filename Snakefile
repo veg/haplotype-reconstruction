@@ -231,11 +231,12 @@ rule simulate_wgs_dataset:
     fasta=rules.simulation_truth_aligned.output[0]
   output:
     fastq=temp("output/sim-{simulated_dataset}_ar-{ar}_seed-{seed}/wgs.fastq"),
+    sam="output/sim-{simulated_dataset}_ar-{ar}_seed-{seed}/wgs.sam",
     json="output/sim-{simulated_dataset}_ar-{ar}_seed-{seed}/simulation_quality.json"
   run:
     simulate_wgs_dataset(
-      wildcards.simulated_dataset, wildcards.ar, input.fasta, output.fastq, output.json,
-      wildcards.seed, NUMBER_OF_READS
+      wildcards.simulated_dataset, wildcards.ar, input.fasta,
+      output.fastq, output.json, output.sam, wildcards.seed, NUMBER_OF_READS
     )
 
 # Situating other data
@@ -357,7 +358,7 @@ rule trimmomatic:
 rule bealign:
   input:
     qc="output/{dataset}/{qc}/qc.fasta",
-    reference="input/references/{reference}.fasta"
+    reference="output/references/{reference}.fasta"
   output:
     bam="output/{dataset}/{qc}/bealign/{reference}/mapped.bam",
     discards="output/{dataset}/{qc}/bealign/{reference}/discards.fasta"
@@ -413,7 +414,7 @@ rule bowtie2_alignment:
     "envs/ngs.yml"
   shell:
     """
-      bowtie2 -x {params} -U {input.fastq} -S {output.sam}
+      bowtie2 -x {params} -U {input.fastq} -S {output.sam} --very-fast
       samtools view -Sb {output.sam} > {output.bam}
     """
 

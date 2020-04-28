@@ -153,7 +153,7 @@ def get_mate(
 
 
 def write_ar_dataset(
-        lanl_ids, frequencies, ar, aligned_genomes, output_fastq,
+        lanl_ids, frequencies, ar, aligned_genomes, output_fastq, output_sam,
         number_of_reads
         ):
     should_recombine = len(lanl_ids) > 1
@@ -270,14 +270,19 @@ def write_ar_dataset(
     nonrecombined_indices = np.random.choice(
         number_of_reads, number_of_clean_reads, replace=False
     )
+    for_template = pysam.AlignmentFile('output/lanl/%s/wgs.sam' % lanl_ids[0], "r")
+    sam_file = pysam.AlignmentFile(output_sam, 'w', template=for_template)
+    for_template.close()
     for strain, index in zip(nonrecombined_strains, nonrecombined_indices):
         read = sams[strain][index]
+        sam_file.write(read)
         output_file.write('@' + read.query_name + '\n')
         output_file.write(read.query + '\n')
         output_file.write('+\n')
         output_file.write(read.qual + '\n')
     print('Total unsuitable reads:', total_unsuitable)
     output_file.close()
+    sam_file.close()
 
 def simulation_truth(dataset, output_fasta):
     with open('simulations.json') as json_file:
@@ -292,7 +297,7 @@ def simulation_truth(dataset, output_fasta):
 
 
 def simulate_wgs_dataset(
-        dataset, ar, input_fasta, output_fastq, output_json,
+        dataset, ar, input_fasta, output_fastq, output_json, output_sam,
         seed=1, number_of_reads=300000
         ):
     np.random.seed(int(seed))
@@ -307,7 +312,7 @@ def simulate_wgs_dataset(
         SeqIO.parse(input_fasta, 'fasta')
     )
     write_ar_dataset(
-        lanl_ids, frequencies, ar, aligned_genomes, output_fastq,
+        lanl_ids, frequencies, ar, aligned_genomes, output_fastq, output_sam,
         number_of_reads
         )
 
