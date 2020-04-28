@@ -7,7 +7,10 @@ from Bio import SeqIO
 import pysam
 import pandas as pd
 import seaborn as sns
+import matplotlib
 import matplotlib.pyplot as plt
+
+matplotlib.use('Agg')
 
 
 def extract_lanl_genome(lanl_input, lanl_id, fasta_output):
@@ -377,3 +380,32 @@ def superread_weight_distribution_data(superreads_filepath, csv_filepath):
             'composition': composition
         })
     csv_file.close()
+
+
+def simulation_coverage(input_sam, output_csv, output_png):
+    mapped_reads = pysam.AlignmentFile(input_sam)
+    n_sites = mapped_reads.lengths[0]
+    all_coverage = {}
+    for read in mapped_reads.fetch():
+        key = read.query_name.split('-')[0]
+        coverage = np.zeros(n_sites)
+        coverage[read.reference_start: read.reference_end] += 1
+        if not key in all_coverage:
+            all_coverage[key] = np.zeros(n_sites)
+        all_coverage[key][read.reference_start: read.reference_end] += 1
+    df = pd.concat([
+        pd.DataFrame({
+            'strain': key,
+            'site': np.arange(n_sites),
+            'coverage': value
+        })
+        for key, value in all_coverage.items()
+    ], axis=0)
+    df.to_csv(output_csv)
+    fig, ax = plt.subplots(figsize=(30, 10))
+    for strain in set(df.strain):
+        ax.plot(
+            df.loc[df.strain == strain, 'site'],
+            df.loc[df.strain == strain, 'coverage']
+        )
+    fig.savefig(output_png)

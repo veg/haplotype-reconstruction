@@ -178,6 +178,7 @@ rule simulation:
     sam="output/lanl/{lanl_id}/wgs.sam",
     bam="output/lanl/{lanl_id}/wgs.bam",
     sorted_bam="output/lanl/{lanl_id}/sorted.bam",
+    index="output/lanl/{lanl_id}/sorted.bam.bai",
     report="output/lanl/{lanl_id}/qualimapReport.html"
   params:
     out="output/lanl/{lanl_id}/wgs",
@@ -190,6 +191,7 @@ rule simulation:
       mv {params.out}.fq {output.fastq}
       samtools view -Sb {output.sam} > {output.bam}
       samtools sort {output.bam} > {output.sorted_bam}
+      samtools index {output.sorted_bam}
       qualimap bamqc -bam {output.sorted_bam} -outdir {params.directory}
     """ % NUMBER_OF_READS
 
@@ -912,6 +914,15 @@ rule chosen_approach:
     "cp {input} {output}"
 
 # Simulation studies
+
+rule simulation_coverage:
+  input:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.bam"
+  output:
+    csv="output/{dataset}/{qc}/{read_mapper}/{reference}/coverage.csv",
+    png="output/{dataset}/{qc}/{read_mapper}/{reference}/coverage.png"
+  run:
+    simulation_coverage(input[0], output.csv, output.png)
 
 def n_paths_boxplot_input(wildcards):
   template_string = "output/sim-%s_ar-%d_seed-%d/fastp/bowtie2/%s/acme/graph.json"
