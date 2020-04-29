@@ -462,7 +462,7 @@ def get_coordinates(input_truth, input_added, output_csv):
   csv_file.close()
 
 
-def get_true_coverage(indicial_map, truth_sam, output_csv, output_png):
+def get_true_coverage(indicial_map, truth_sam, output_csv):
     im = pd.read_csv(indicial_map)
     filtered = im.loc[im.iloc[:, -1] != '-', :]
     start = filtered.iloc[0, 1]
@@ -480,7 +480,6 @@ def get_true_coverage(indicial_map, truth_sam, output_csv, output_png):
         coverage_stop = np.min(
             [np.max([0, read.reference_end - start]), n_sites]
         )
-        print(start, stop, read.reference_start, read.reference_end, coverage_start, coverage_stop)
         coverage[strain_name][coverage_start: coverage_stop] += 1
     df = pd.concat([
         pd.DataFrame({
@@ -491,11 +490,3 @@ def get_true_coverage(indicial_map, truth_sam, output_csv, output_png):
         for key, value in coverage.items()
     ], axis=0)
     df.to_csv(output_csv)
-    fig, ax = plt.subplots(figsize=(30, 10))
-    for strain in set(df.strain):
-        ax.plot(
-            df.loc[df.strain == strain, 'site'],
-            df.loc[df.strain == strain, 'coverage']
-        )
-    ax.set_ylim([0, df.coverage.max()])
-    fig.savefig(output_png)

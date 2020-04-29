@@ -262,10 +262,17 @@ rule get_true_coverage:
     indicial_map=rules.get_coordinates.output[0],
     truth_sam=rules.simulate_wgs_dataset.output.sam
   output:
-    csv="output/sim-{simulated_dataset}_ar-{ar}_seed-{seed}/{reference}_coverage.csv",
-    plot="output/sim-{simulated_dataset}_ar-{ar}_seed-{seed}/{reference}_coverage.png"
+    "output/sim-{simulated_dataset}_ar-{ar}_seed-{seed}/{reference}_coverage.csv"
   run:
-    get_true_coverage(input.indicial_map, input.truth_sam, output.csv, output.plot)
+    get_true_coverage(input.indicial_map, input.truth_sam, output[0])
+
+rule get_true_coverage_plot:
+  input:
+    rules.get_true_coverage.output[0]
+  output:
+    "output/sim-{simulated_dataset}_ar-{ar}_seed-{seed}/{reference}_coverage.png"
+  script:
+    "R/coverage_plot.R"
 
 # Situating other data
 
@@ -979,6 +986,13 @@ rule master_coverage_data:
   shell:
     "cat {input} > {output}"
 
+rule master_coverage_plot:
+  input:
+    rules.master_coverage_data.output[0]
+  output:
+    "output/{dataset}/{qc}/bowtie2/{reference}/coverage.png"
+  script:
+    "R/master_coverage_plot.R"
 
 def n_paths_boxplot_input(wildcards):
   template_string = "output/sim-%s_ar-%d_seed-%d/fastp/bowtie2/%s/acme/graph.json"
