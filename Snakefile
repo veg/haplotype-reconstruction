@@ -965,11 +965,10 @@ rule simulation_coverage:
   input:
     rules.bowtie2_parameter_study.output.bam
   output:
-    csv="output/{dataset}/{qc}/bowtie2/{reference}/coverage_b-{b}_m-{m}_q-{q}.csv",
-    png="output/{dataset}/{qc}/bowtie2/{reference}/coverage_b-{b}_m-{m}_q-{q}.png"
+    "output/{dataset}/{qc}/bowtie2/{reference}/coverage_b-{b}_m-{m}_q-{q}.csv"
   run:
     simulation_coverage(
-      input[0], output.csv, output.png,
+      input[0], output[0],
       wildcards.b, wildcards.m, wildcards.q
     )
 
@@ -982,7 +981,7 @@ rule master_coverage_data:
       q=[0, 20, 40]
     )
   output:
-    "output/{dataset}/{qc}/bowtie2/{reference}/coverage.csv"
+    "output/{dataset}/{qc}/bowtie2/{reference}/master-coverage.csv"
   shell:
     "cat {input} > {output}"
 
@@ -990,9 +989,25 @@ rule master_coverage_plot:
   input:
     rules.master_coverage_data.output[0]
   output:
-    "output/{dataset}/{qc}/bowtie2/{reference}/coverage.png"
+    "output/{dataset}/{qc}/bowtie2/{reference}/master-coverage.png"
   script:
     "R/master_coverage_plot.R"
+
+rule generic_coverage_data:
+  input:
+    rules.sort_and_index.output.bam
+  output:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/coverage.csv"
+  run:
+    simulation_coverage(input[0], output[0])
+
+rule generic_coverage_plot:
+  input:
+    rules.generic_coverage_data.output[0]
+  output:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/coverage.png"
+  script:
+    "R/coverage_plot.R"
 
 def n_paths_boxplot_input(wildcards):
   template_string = "output/sim-%s_ar-%d_seed-%d/fastp/bowtie2/%s/acme/graph.json"

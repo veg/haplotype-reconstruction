@@ -387,7 +387,7 @@ def superread_weight_distribution_data(superreads_filepath, csv_filepath):
     csv_file.close()
 
 
-def simulation_coverage(input_sam, output_csv, output_png, b, m, q):
+def simulation_coverage(input_sam, output_csv,  b=None, m=None, q=None):
     mapped_reads = pysam.AlignmentFile(input_sam)
     n_sites = mapped_reads.lengths[0]
     all_coverage = {}
@@ -402,21 +402,15 @@ def simulation_coverage(input_sam, output_csv, output_png, b, m, q):
         pd.DataFrame({
             'strain': key,
             'site': np.arange(n_sites),
-            'coverage': value,
-            'b': b,
-            'm': m,
-            'q': q
+            'coverage': value
         })
         for key, value in all_coverage.items()
     ], axis=0)
+    if b or m or q:
+        df['b'] = b
+        df['m'] = m
+        df['q'] = q
     df.to_csv(output_csv)
-    fig, ax = plt.subplots(figsize=(30, 10))
-    for strain in set(df.strain):
-        ax.plot(
-            df.loc[df.strain == strain, 'site'],
-            df.loc[df.strain == strain, 'coverage']
-        )
-    fig.savefig(output_png)
 
 
 def get_coordinates(input_truth, input_added, output_csv):
