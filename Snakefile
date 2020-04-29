@@ -239,6 +239,34 @@ rule simulate_wgs_dataset:
       output.fastq, output.json, output.sam, wildcards.seed, NUMBER_OF_READS
     )
 
+rule add_reference:
+  input:
+    truth=rules.simulation_truth_aligned.output[0],
+    reference="output/references/{reference}.fasta"
+  output:
+    "output/truth/{simulated_dataset}/{reference}_added.fasta"
+  shell:
+    "mafft --add {input.reference} {input.truth} > {output}"
+
+rule get_coordinates:
+  input:
+    truth=rules.simulation_truth_aligned.output[0],
+    added=rules.add_reference.output[0]
+  output:
+    "output/truth/{simulated_dataset}/{reference}_coordinates.csv"
+  run:
+    get_coordinates(input.truth, input.added, output[0])
+
+rule get_true_coverage:
+  input:
+    indicial_map=rules.get_coordinates.output[0],
+    truth_sam=rules.simulate_wgs_dataset.output.sam
+  output:
+    csv="output/sim-{simulated_dataset}_ar-{ar}_seed-{seed}/{reference}_coverage.csv",
+    plot="output/sim-{simulated_dataset}_ar-{ar}_seed-{seed}/{reference}_coverage.png"
+  run:
+    get_true_coverage(input.indicial_map, input.truth_sam, output.csv, output.plot)
+
 # Situating other data
 
 rule sra_dataset:

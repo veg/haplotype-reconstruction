@@ -414,3 +414,85 @@ def simulation_coverage(input_sam, output_csv, output_png):
             df.loc[df.strain == strain, 'coverage']
         )
     fig.savefig(output_png)
+
+
+def get_coordinates(input_truth, input_added, output_csv):
+  original_records = list(sorted(
+    SeqIO.parse(input_truth, 'fasta'),
+    key=lambda record: record.name
+  ))
+  original_hash = { record.name: True for record in original_records }
+  full_hash = SeqIO.to_dict(SeqIO.parse(input_added, 'fasta'))
+  original_np = np.array([
+    list(str(record.seq)) for record in original_records
+  ], dtype='<U1')
+  full_np = np.array([
+    list(str(full_hash[record.name].seq)) for record in original_records
+  ], dtype='<U1')
+  additional_names = [
+    record.name
+    for name, record in full_hash.items()
+    if not name in original_hash
+  ]
+  additional_headers = [name+'_index' for name in additional_names]
+
+  csv_file = open(output_csv, 'w')
+  writer = csv.writer(csv_file)
+  writer.writerow(['full_index', 'original_index'] + additional_headers)
+
+  original_index = 0
+  additional_indices = [0 for _ in additional_headers]
+  for full_index in range(full_np.shape[1]):
+    current_additional_indices = []
+    for i, additional_index in enumerate(additional_indices):
+      name = additional_names[i]
+      record = full_hash[name]
+      isnt_gap = record.seq[full_index] != '-'
+      if isnt_gap:
+        current_additional_indices.append(additional_index)
+        additional_indices[i] += 1
+      else:
+        current_additional_indices.append('-')
+    if np.all(original_np[:, original_index] == full_np[:, full_index]):
+      writer.writerow([full_index, original_index] + current_additional_indices)
+      original_index += 1
+  csv_file.close()
+
+
+def get_true_coverage(indicial_map, truth_sam, output_csv, output_png):
+    im = pd.read_csv(indicial_map)
+    filtered = im.loc[im.iloc[:, -1] != '-', :]
+    start = filtered.iloc[0, 1]
+    stop = filtered.iloc[-1, 1]
+    n_sites = stop-start+1
+    coverage = {}
+    mapped_reads = pysam.AlignmentFile(truth_sam, 'r')
+    for read in mapped_reads.fetch(until_eof=True):
+        strain_name = read.query_name.split('-')[0]
+        if not strain_name in coverage:
+            coverage[strain_name] = np.zeros(n_sites)
+        coverage_start = np.min(
+            [np.max([0, read.reference_start - start]), n_sites]
+        )
+        coverage_stop = np.min(
+            [np.max([0, read.reference_end - start]), n_sites]
+        )
+        print(start, stop, read.reference_start, read.reference_end, coverage_start, coverage_stop)
+        coverage[strain_name][coverage_start: coverage_stop] += 1
+    df = pd.concat([
+        pd.DataFrame({
+            'strain': key,
+            'site': np.arange(n_sites),
+            'coverage': value
+        })
+        for key, value in coverage.items()
+    ], axis=0)
+    df.to_csv(output_csv)
+    fig, ax = plt.subplots(figsize=(30, 10))
+    for strain in set(df.strain):
+        ax.plot(
+            df.loc[df.strain == strain, 'site'],
+            df.loc[df.strain == strain, 'coverage']
+        )
+    ax.set_ylim([0, df.coverage.max()])
+    fig.savefig(output_png)
