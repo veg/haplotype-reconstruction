@@ -424,7 +424,7 @@ rule bowtie2_index:
   shell:
     "bowtie2-build {input.reference} {params}"
 
-rule bowtie2_alignment:
+rule bowtie2_parameter_study:
   input:
     fastq="output/{dataset}/{qc}/qc.fastq",
     bt1=rules.bowtie2_index.output.bt1,
@@ -434,17 +434,27 @@ rule bowtie2_alignment:
     revbt1=rules.bowtie2_index.output.revbt1,
     revbt2=rules.bowtie2_index.output.revbt2
   output:
-    sam="output/{dataset}/{qc}/bowtie2/{reference}/mapped.sam",
-    bam="output/{dataset}/{qc}/bowtie2/{reference}/mapped.bam"
+    sam="output/{dataset}/{qc}/bowtie2/{reference}/mapped_b-{b}_m-{m}_q-{q}.sam",
+    bam="output/{dataset}/{qc}/bowtie2/{reference}/mapped_b-{b}_m-{m}_q-{q}.bam"
   params:
-    lambda wildcards: "output/references/%s" % wildcards.reference
+    index_loc=lambda wildcards: "output/references/%s" % wildcards.reference,
+    score=lambda wildcards: "L,-%s,-%s" % (wildcards.b, wildcards.m)
   conda:
     "envs/ngs.yml"
   shell:
     """
-      bowtie2 -x {params} -U {input.fastq} -S {output.sam} --very-fast
-      samtools view -Sb {output.sam} > {output.bam}
+      bowtie2 -x {params.index_loc} -U {input.fastq} -S {output.sam} \
+        --score-min {params.score}
+      samtools view -Sbq {wildcards.q} {output.sam} > {output.bam}
     """
+
+rule bowtie2_alignment:
+  input:
+    "output/{dataset}/{qc}/bowtie2/{reference}/mapped_b-1_m-1_q-1.bam"
+  output:
+    "output/{dataset}/{qc}/bowtie2/{reference}/mapped.bam"
+  shell:
+    "cp {input} {output}"
 
 rule minimap2:
   input:
@@ -946,12 +956,29 @@ rule chosen_approach:
 
 rule simulation_coverage:
   input:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.bam"
+    rules.bowtie2_parameter_study.output.bam
   output:
-    csv="output/{dataset}/{qc}/{read_mapper}/{reference}/coverage.csv",
-    png="output/{dataset}/{qc}/{read_mapper}/{reference}/coverage.png"
+    csv="output/{dataset}/{qc}/bowtie2/{reference}/coverage_b-{b}_m-{m}_q-{q}.csv",
+    png="output/{dataset}/{qc}/bowtie2/{reference}/coverage_b-{b}_m-{m}_q-{q}.png"
   run:
-    simulation_coverage(input[0], output.csv, output.png)
+    simulation_coverage(
+      input[0], output.csv, output.png,
+      wildcards.b, wildcards.m, wildcards.q
+    )
+
+rule master_coverage_data:
+  input:
+    expand(
+      "output/{{dataset}}/{{qc}}/bowtie2/{{reference}}/coverage_b-{b}_m-{m}_q-{q}.csv",
+      b=[.6, 1.2, 1.8],
+      m=[.6, 1.2, 1.8],
+      q=[0, 20, 40]
+    )
+  output:
+    "output/{dataset}/{qc}/bowtie2/{reference}/coverage.csv"
+  shell:
+    "cat {input} > {output}"
+
 
 def n_paths_boxplot_input(wildcards):
   template_string = "output/sim-%s_ar-%d_seed-%d/fastp/bowtie2/%s/acme/graph.json"

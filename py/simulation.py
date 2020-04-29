@@ -387,11 +387,11 @@ def superread_weight_distribution_data(superreads_filepath, csv_filepath):
     csv_file.close()
 
 
-def simulation_coverage(input_sam, output_csv, output_png):
+def simulation_coverage(input_sam, output_csv, output_png, b, m, q):
     mapped_reads = pysam.AlignmentFile(input_sam)
     n_sites = mapped_reads.lengths[0]
     all_coverage = {}
-    for read in mapped_reads.fetch():
+    for read in mapped_reads.fetch(until_eof=True):
         key = read.query_name.split('-')[0]
         coverage = np.zeros(n_sites)
         coverage[read.reference_start: read.reference_end] += 1
@@ -402,7 +402,10 @@ def simulation_coverage(input_sam, output_csv, output_png):
         pd.DataFrame({
             'strain': key,
             'site': np.arange(n_sites),
-            'coverage': value
+            'coverage': value,
+            'b': b,
+            'm': m,
+            'q': q
         })
         for key, value in all_coverage.items()
     ], axis=0)
