@@ -373,7 +373,8 @@ def superread_weight_distribution_data(superreads_filepath, csv_filepath):
     with open(superreads_filepath) as json_file:
         superreads = json.load(json_file)
     csv_file = open(csv_filepath, 'w')
-    csv_writer = csv.DictWriter(csv_file, fieldnames=['weight', 'composition'])
+    fieldnames = ['weight', 'composition', 'vacs_length']
+    csv_writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
     csv_writer.writeheader()
     for superread in superreads:
         composition = max(
@@ -382,6 +383,7 @@ def superread_weight_distribution_data(superreads_filepath, csv_filepath):
         )[0]
         csv_writer.writerow({
             'weight': superread['weight'],
+            'vacs_length': len(superread['vacs']),
             'composition': composition
         })
     csv_file.close()

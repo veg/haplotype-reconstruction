@@ -1038,7 +1038,8 @@ rule superread_weight_distribution_plot:
   input:
     rules.superread_weight_distribution_data.output[0]
   output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/superread_distribution.png"
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/superread_histogram.png",
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/superread_scatter_plot.png"
   script:
     "R/superread_distribution.R"
 
