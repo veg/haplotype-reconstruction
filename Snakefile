@@ -2,13 +2,7 @@ import os
 import json
 
 import pysam
-from convex_qsr import covarying_sites_io
-from convex_qsr import superread_json_io
-from convex_qsr import superread_fasta_io
-from convex_qsr import graph_io
-from convex_qsr import candidates_io
-from convex_qsr import regression_io
-
+from convex_qsr import *
 from py import *
 
 
@@ -958,6 +952,22 @@ rule chosen_approach:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/haplotypes.fasta"
   shell:
     "cp {input} {output}"
+
+rule edge_list:
+  input:
+    rules.superreads.output[0]
+  output:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/edge_list.csv"
+  run:
+    edge_list_io(input[0], output[0])
+
+rule scaffold_describing:
+  input:
+    rules.superreads.output[0]
+  output:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/scaffold_describing.json"
+  run:
+    scaffold_qsr_io(input[0], output[0])
 
 # Simulation studies
 
