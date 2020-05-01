@@ -969,6 +969,18 @@ rule scaffold_describing:
   run:
     scaffold_qsr_io(input[0], output[0])
 
+rule scaffold_candidates:
+  input:
+    superreads=rules.superreads.output[0],
+    description=rules.scaffold_describing.output[0]
+  output:
+    fasta="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/scaffold_candidates.fasta"
+  run:
+    scaffold_candidates_io(
+      input.superreads, input.description,
+      output.fasta
+    )
+
 # Simulation studies
 
 rule simulation_coverage:
