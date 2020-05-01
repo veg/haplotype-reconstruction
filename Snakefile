@@ -974,11 +974,12 @@ rule scaffold_candidates:
     superreads=rules.superreads.output[0],
     description=rules.scaffold_describing.output[0]
   output:
-    fasta="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/scaffold_candidates.fasta"
+    fasta="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/scaffold_candidates.fasta",
+    csv="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/scaffold_candidates.csv"
   run:
     scaffold_candidates_io(
       input.superreads, input.description,
-      output.fasta
+      output.fasta, output.csv
     )
 
 # Simulation studies
