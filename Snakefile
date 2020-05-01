@@ -965,17 +965,17 @@ rule scaffold_describing:
   input:
     rules.superreads.output[0]
   output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/scaffold_describing.json"
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/scaffold/describing.json"
   run:
-    scaffold_qsr_io(input[0], output[0])
+    scaffold_qsr_io(input[0], output[0], max_qs=2)
 
 rule scaffold_candidates:
   input:
     superreads=rules.superreads.output[0],
     description=rules.scaffold_describing.output[0]
   output:
-    fasta="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/scaffold_candidates.fasta",
-    csv="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/scaffold_candidates.csv"
+    fasta="output/{dataset}/{qc}/{read_mapper}/{reference}/scaffold/candidates.fasta",
+    csv="output/{dataset}/{qc}/{read_mapper}/{reference}/scaffold/candidates.csv"
   run:
     scaffold_candidates_io(
       input.superreads, input.description,
@@ -989,7 +989,7 @@ rule scaffold_quasispecies:
     consensus=rules.covarying_sites.output.fasta,
     covarying_sites=rules.covarying_sites.output.json
   output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/scaffold_quasispecies.fasta"
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/scaffold/haplotypes.fasta"
   run:
     simple_scaffold_reconstruction_io(
       input.candidates, input.frequencies, input.consensus,
@@ -1114,33 +1114,6 @@ rule haplotypes_and_truth_heatmap:
     "envs/R.yml"
   script:
     "R/truth_heatmap.R"
-
-rule scaffold_and_truth:
-  input:
-    haplotypes="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/scaffold_quasispecies.fasta",
-    truth=reference_input
-  output:
-    unaligned="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/truth_and_scaffold_unaligned.fasta",
-    aligned="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/truth_and_scaffold.fasta",
-    progress=os.getcwd()+"output/{dataset}/{qc}/{read_mapper}/{reference}/acme/scaffold-progress.txt",
-    csv="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/truth_and_scaffold.csv",
-    json="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/truth_and_scaffold.json"
-  run:
-    shell("cat {input.haplotypes} {input.truth} > {output.unaligned}")
-    shell("mafft --progress {output.progress} {output.unaligned} > {output.aligned}")
-    pairwise_distance_csv(output.aligned, output.csv)
-    result_json(output.csv, output.json)
-
-rule scaffold_and_truth_heatmap:
-  input:
-    rules.scaffold_and_truth.output.csv
-  output:
-    png="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/truth_and_scaffold.png"
-  conda:
-    "envs/R.yml"
-  script:
-    "R/truth_heatmap.R"
-
 
 # Regress Haplo
 
