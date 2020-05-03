@@ -70,14 +70,6 @@ rule all_haplotypers:
       reference=REFERENCE_SUBSET
     )
 
-rule all_acme_running:
-  input:
-    "output/sim-divergedFive_ar-10_seed-1/fastp/bowtie2/pol/acme/truth_and_haplotypes.json"
-  output:
-    "output/running_report.csv"
-  run:
-    report(input, output[0], 'running')
-
 rule all_acme_reconstructing:
   input:
     "output/sim-divergedPair_ar-10_seed-1/fastp/bowtie2/pol/acme/truth_and_haplotypes.json",
@@ -86,18 +78,6 @@ rule all_acme_reconstructing:
     "output/reconstruction_report.csv"
   run:
     report(input, output[0], 'reconstructing')
-
-rule report:
-  input:
-    reconstructing=rules.all_acme_reconstructing.output[0],
-    running=rules.all_acme_running.output[0]
-  output:
-    "output/report.csv"
-  shell:
-    """
-      cat {input.reconstructing} > {output}
-      tail -n +2 {input.running} >> {output}
-    """
 
 rule haplotyper_truth_report:
   input:
@@ -700,7 +680,7 @@ rule readreduce:
 
 # ACME haplotype reconstruction
 
-WEIGHT_FILTER = 5
+WEIGHT_FILTER = 0
 
 def true_sequences_input(wildcards):
   if wildcards.known_dataset[:len(FVM_STRING)] == FVM_STRING:
@@ -960,6 +940,14 @@ rule edge_list:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/edge_list.csv"
   run:
     edge_list_io(input[0], output[0])
+
+rule resolvable_regions:
+  input:
+    rules.superreads.output[0]
+  output:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/scaffold/resolvable.json"
+  run:
+    resolvable_regions_io(input[0], output[0])
 
 rule scaffold_describing:
   input:
