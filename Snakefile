@@ -984,6 +984,16 @@ rule scaffold_quasispecies:
       input.covarying_sites, output[0]
     )
 
+rule scaffold_ar_rate:
+  input:
+    superreads=rules.superreads.output[0],
+    description=rules.scaffold_describing.output[0]
+  output:
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/scaffold/ar.json"
+  run:
+    ar_rate_estimation_io(input.superreads, input.description, output[0])
+
+
 # Simulation studies
 
 rule simulation_coverage:
