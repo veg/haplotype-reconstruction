@@ -1,4 +1,5 @@
 import os
+import itertools as it
 import json
 
 import pysam
@@ -46,6 +47,19 @@ rule sarscov2:
       reference=SARSCOV2_REFERENCES,
       haplotyper=HAPLOTYPERS
     )
+
+simulated_ar = [0, 5, 10, 15, 20]
+simulated_seeds = range(3)
+seeded_simulations = [
+  '%s_ar-%d_seed-%d' % simulation for simulation in it.product(SIMULATED_DATASETS, simulated_ar, simulated_seeds)
+]
+rule simulation_study:
+  input:
+    [
+      "output/%s/fastp/bowtie2/%s/%s/truth_and_haplotypes.png" % parameters
+      for parameters in it.product(seeded_simulations, ['acme-pol'], HAPLOTYPERS)
+    ]
+
 
 rule all_haplotypers:
   input:
@@ -548,6 +562,8 @@ rule regress_haplo_full:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.bam.bai",
   output:
     temp("output/{dataset}/{qc}/{read_mapper}/{reference}/regress_haplo/final_haplo.fasta")
+  conda:
+    "envs/regress_haplo.yml"
   script:
     "R/regress_haplo/full_pipeline.R"
 
