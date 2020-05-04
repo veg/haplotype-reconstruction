@@ -26,6 +26,10 @@ REFERENCE_SUBSET = ["env", "pol", "gag"]
 HYPHY_PATH = "/Users/stephenshank/Software/lib/hyphy"
 HAPLOTYPERS = ["abayesqr", "regress_haplo", "quasirecomb", "acme"]
 NUMBER_OF_READS = 300000
+DEEP_SEQUENCING_ACCESSIONS = [
+  "SRR3221805", "SRR3221806", "SRR3221807", "SRR3221818", "SRR3221820",
+  "SRR3221821", "SRR3221822", "SRR3221823", "SRR3221826", "SRR3221833"
+]
 with open('input/sarscov2_accessions.txt') as sarscov2_accession_file:
   SARSCOV2_ACCESSIONS = [
     line.strip() for line in sarscov2_accession_file.readlines()
@@ -48,6 +52,13 @@ rule sarscov2:
       haplotyper=HAPLOTYPERS
     )
 
+rule deep_sequencing_study:
+  input:
+    [
+      "output/%s/fastp/bealign/acme-env/acme/covarying_sites.json" % parameters
+      for parameters in DEEP_SEQUENCING_ACCESSIONS
+    ]
+
 simulated_ar = [0, 5, 10, 15, 20]
 simulated_seeds = range(3)
 seeded_simulations = [
@@ -60,6 +71,14 @@ rule simulation_study:
       for parameters in it.product(seeded_simulations, ['acme-pol'], HAPLOTYPERS)
     ]
 
+
+rule intrahost:
+  input:
+    expand(
+      "output/{dataset}/fastp/bowtie2/{reference}/scaffold/resolvable.json",
+      dataset=['ERR76064%d' % i for i in range(3, 10)],
+      reference=['acme-env', 'acme-gag', 'acme-pol']
+    )
 
 rule all_haplotypers:
   input:
