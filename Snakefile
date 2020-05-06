@@ -24,7 +24,7 @@ KNOWN_TRUTH = SIMULATED_DATASETS + ["FiveVirusMixIllumina_1"]
 ALL_REFERENCES = ["env", "rev", "vif", "pol", "prrt", "rt", "pr", "gag", "int", "tat"] # + ["nef", "vpr"] 
 REFERENCE_SUBSET = ["env", "pol", "gag"]
 HYPHY_PATH = "/Users/stephenshank/Software/lib/hyphy"
-HAPLOTYPERS = ["abayesqr", "regress_haplo", "quasirecomb", "acme"]
+HAPLOTYPERS = ["abayesqr", "regress_haplo", "quasirecomb", "scaffold"]
 NUMBER_OF_READS = 300000
 DEEP_SEQUENCING_ACCESSIONS = [
   "SRR3221805", "SRR3221806", "SRR3221807", "SRR3221818", "SRR3221820",
@@ -60,14 +60,14 @@ rule deep_sequencing_study:
     ]
 
 simulated_ar = [0, 5, 10, 15, 20]
-simulated_seeds = range(3)
+simulated_seeds = [1]
 seeded_simulations = [
   '%s_ar-%d_seed-%d' % simulation for simulation in it.product(SIMULATED_DATASETS, simulated_ar, simulated_seeds)
 ]
 rule simulation_study:
   input:
     [
-      "output/%s/fastp/bowtie2/%s/%s/truth_and_haplotypes.png" % parameters
+      "output/%s/fastp/bowtie2/%s/%s/stop.txt" % parameters
       for parameters in it.product(seeded_simulations, ['acme-pol'], HAPLOTYPERS)
     ]
 
@@ -580,7 +580,9 @@ rule regress_haplo_full:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.bam",
     "output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.bam.bai",
   output:
-    temp("output/{dataset}/{qc}/{read_mapper}/{reference}/regress_haplo/final_haplo.fasta")
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/regress_haplo/final_haplo.fasta",
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/regress_haplo/start.txt",
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/regress_haplo/stop.txt"
   conda:
     "envs/regress_haplo.yml"
   script:
@@ -619,15 +621,19 @@ rule quasirecomb:
     jar=rules.quasirecomb_jar.output[0],
     bam="output/{dataset}/{qc}/{read_mapper}/{reference}/sorted.bam"
   output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/quasirecomb/haplotypes.fasta"
+    fasta="output/{dataset}/{qc}/{read_mapper}/{reference}/quasirecomb/haplotypes.fasta",
+    start="output/{dataset}/{qc}/{read_mapper}/{reference}/quasirecomb/start.txt",
+    stop="output/{dataset}/{qc}/{read_mapper}/{reference}/quasirecomb/stop.txt"
   params:
     basedir="output/{dataset}/{qc}/{read_mapper}/{reference}/quasirecomb"
   conda:
     "envs/quasirecomb.yml"
   shell:
     """
+      date +'%s' > {output.start}
       java -jar QuasiRecomb.jar -conservative -o {params.basedir} -i {input.bam}
       mv {params.basedir}/quasispecies.fasta {params.basedir}/haplotypes.fasta
+      date +'%s' > {output.stop}
     """
 
 rule savage:
@@ -663,13 +669,17 @@ rule abayesqr:
     freq="output/{dataset}/{qc}/{read_mapper}/{reference}/abayesqr/test_Freq.txt",
     seq="output/{dataset}/{qc}/{read_mapper}/{reference}/abayesqr/test_Seq.txt",
     viralseq="output/{dataset}/{qc}/{read_mapper}/{reference}/abayesqr/test_ViralSeq.txt",
-    fasta="output/{dataset}/{qc}/{read_mapper}/{reference}/abayesqr/haplotypes.fasta"
+    fasta="output/{dataset}/{qc}/{read_mapper}/{reference}/abayesqr/haplotypes.fasta",
+    start="output/{dataset}/{qc}/{read_mapper}/{reference}/abayesqr/start.txt",
+    stop="output/{dataset}/{qc}/{read_mapper}/{reference}/abayesqr/stop.txt"
   run:
+    write_time(output.start)
     shell("aBayesQR {input}")
     shell("mv test_Freq.txt {output.freq}")
     shell("mv test_Seq.txt {output.seq}")
     shell("mv test_ViralSeq.txt {output.viralseq}")
     parse_abayesqr_output(output.viralseq, output.fasta)
+    write_time(output.stop)
 
 rule shorah:
   input:
@@ -739,8 +749,10 @@ rule covarying_sites:
   output:
     json="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/covarying_sites.json",
     fasta="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/consensus.fasta",
-    covariation="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/covariation.csv"
+    covariation="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/covariation.csv",
+    start="output/{dataset}/{qc}/{read_mapper}/{reference}/scaffold/start.txt"
   run:
+    write_time(output.start)
     covarying_sites_io(input[0], output.json, output.fasta, output.covariation, threshold=.05)
 
 rule true_covarying_sites:
@@ -1012,12 +1024,14 @@ rule scaffold_quasispecies:
     consensus=rules.covarying_sites.output.fasta,
     covarying_sites=rules.covarying_sites.output.json
   output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/scaffold/haplotypes.fasta"
+    fasta="output/{dataset}/{qc}/{read_mapper}/{reference}/scaffold/haplotypes.fasta",
+    stop="output/{dataset}/{qc}/{read_mapper}/{reference}/scaffold/stop.txt"
   run:
     simple_scaffold_reconstruction_io(
       input.candidates, input.frequencies, input.consensus,
-      input.covarying_sites, output[0]
+      input.covarying_sites, output.fasta
     )
+    write_time(output.stop)
 
 rule scaffold_ar_rate:
   input:

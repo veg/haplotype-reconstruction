@@ -2,6 +2,7 @@ import subprocess
 import json
 import os
 import csv
+from time import time
 
 import numpy as np
 import pandas as pd
@@ -718,3 +719,9 @@ def filter_bam(input_bam_file, output_bam_file, mapping_cutoff=1):
             output_bam.write(read)
     input_bam.close()
     output_bam.close()
+
+
+def write_time(path):
+    current_time = int(time())
+    with open(path, 'w') as text_file:
+        text_file.write('%d' % current_time)
