@@ -725,3 +725,12 @@ def write_time(path):
     current_time = int(time())
     with open(path, 'w') as text_file:
         text_file.write('%d' % current_time)
+
+
+def compute_total_time(start_path, stop_path, total_path):
+    with open(start_path) as start_file, open(stop_path) as stop_file:
+        start_value = int(start_file.read())
+        stop_value = int(stop_file.read())
+    total_value = stop_value - start_value
+    with open(total_path, 'w') as total_file:
+        total_file.write('%d' % total_value)

@@ -750,10 +750,16 @@ rule covarying_sites:
     json="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/covarying_sites.json",
     fasta="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/consensus.fasta",
     covariation="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/covariation.csv",
-    start="output/{dataset}/{qc}/{read_mapper}/{reference}/scaffold/start.txt"
+    start="output/{dataset}/{qc}/{read_mapper}/{reference}/scaffold/start.txt",
+    covarying_start="output/{dataset}/{qc}/{read_mapper}/{reference}/scaffold/times/cs_start.txt",
+    covarying_stop="output/{dataset}/{qc}/{read_mapper}/{reference}/scaffold/times/cs_stop.txt",
+    covarying_total="output/{dataset}/{qc}/{read_mapper}/{reference}/scaffold/times/cs_total.txt"
   run:
+    write_time(output.covarying_start)
     write_time(output.start)
     covarying_sites_io(input[0], output.json, output.fasta, output.covariation, threshold=.05)
+    write_time(output.covarying_stop)
+    compute_total_time(output.covarying_start, output.covarying_stop, output.covarying_total)
 
 rule true_covarying_sites:
   input:
@@ -787,11 +793,17 @@ rule covarying_truth_comparison:
 rule superreads:
   input:
     alignment=rules.sort_and_index.output.bam,
-    covarying_sites=rules.covarying_sites.output[0]
+    covarying_sites=rules.covarying_sites.output[0],
   output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/superreads.json",
+    json="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/superreads.json",
+    superread_start="output/{dataset}/{qc}/{read_mapper}/{reference}/scaffold/times/sr_start.txt",
+    superread_stop="output/{dataset}/{qc}/{read_mapper}/{reference}/scaffold/times/sr_stop.txt",
+    superread_total="output/{dataset}/{qc}/{read_mapper}/{reference}/scaffold/times/sr_total.txt"
   run:
-    superread_json_io(input.alignment, input.covarying_sites, output[0])
+    write_time(output.superread_start)
+    superread_json_io(input.alignment, input.covarying_sites, output.json)
+    write_time(output.superread_stop)
+    compute_total_time(output.superread_start, output.superread_stop, output.superread_total)
 
 rule superread_fasta:
   input:
