@@ -26,10 +26,6 @@ REFERENCE_SUBSET = ["env", "pol", "gag"]
 HYPHY_PATH = "/Users/stephenshank/Software/lib/hyphy"
 HAPLOTYPERS = ["abayesqr", "regress_haplo", "quasirecomb", "scaffold"]
 NUMBER_OF_READS = 300000
-DEEP_SEQUENCING_ACCESSIONS = [
-  "SRR3221805", "SRR3221806", "SRR3221807", "SRR3221818", "SRR3221820",
-  "SRR3221821", "SRR3221822", "SRR3221823", "SRR3221826", "SRR3221833"
-]
 with open('input/sarscov2_accessions.txt') as sarscov2_accession_file:
   SARSCOV2_ACCESSIONS = [
     line.strip() for line in sarscov2_accession_file.readlines()
@@ -52,12 +48,30 @@ rule sarscov2:
       haplotyper=HAPLOTYPERS
     )
 
-rule deep_sequencing_study:
+
+def get_dataset_gene_pairs(dataset, genes):
+  with open('input/%s.txt' % dataset) as accession_file:
+    accessions = [line.strip() for line in accession_file.readlines()]
+  accession_gene_pairs = it.product(accessions, genes)
+  return [
+    "output/%s/fastp/bowtie2/%s/scaffold/resolvable.json" % pair
+    for pair in accession_gene_pairs
+  ]
+
+
+rule hiv:
   input:
-    [
-      "output/%s/fastp/bealign/acme-env/acme/covarying_sites.json" % parameters
-      for parameters in DEEP_SEQUENCING_ACCESSIONS
-    ]
+    it.chain(
+      get_dataset_gene_pairs(
+        'CurrentiPlosPath2019SRRs', ['acme-gag', 'acme-pol', 'acme-nef']
+      ),
+      get_dataset_gene_pairs(
+        'SwanstromJournalOfVirology2016SRRs', ['acme-env']
+      ),
+      get_dataset_gene_pairs(
+        'DialdestoroGenetics2016ERSs', ['acme-gag', 'acme-pol', 'acme-nef', 'acme-env']
+      )
+    )
 
 simulated_ar = [0, 5, 10, 15, 20]
 simulated_seeds = [1]
@@ -301,15 +315,9 @@ rule sra_dataset:
 
 def situate_input(wildcards):
   dataset = wildcards.dataset
-  is_evolution_dataset = dataset[:7] == 'ERS6610'
-  is_amplicon_dataset = 'amplicon' in dataset
   is_simulated_dataset = 'sim-' in dataset
   is_sra_dataset = dataset[:2] == 'SR'
 
-  if is_evolution_dataset:
-    return "input/evolution/%s.fastq" % dataset
-  if is_amplicon_dataset:
-    return "output/%s/amplicon.fastq" % dataset
   if is_simulated_dataset:
     return "output/%s/wgs.fastq" % dataset
   if is_sra_dataset:
