@@ -3,7 +3,7 @@ import itertools as it
 import json
 
 import pysam
-from convex_qsr import *
+from superseal import *
 from py import *
 
 
@@ -54,7 +54,7 @@ def get_dataset_gene_pairs(dataset, genes):
     accessions = [line.strip() for line in accession_file.readlines()]
   accession_gene_pairs = it.product(accessions, genes)
   return [
-    "output/%s/fastp/bowtie2/%s/scaffold/resolvable.json" % pair
+    "output/%s/fastp/bowtie2/%s/acme/superreads.fasta" % pair
     for pair in accession_gene_pairs
   ]
 
@@ -82,7 +82,7 @@ rule simulation_study:
   input:
     [
       "output/%s/fastp/bowtie2/%s/%s/stop.txt" % parameters
-      for parameters in it.product(seeded_simulations, ['acme-pol'], HAPLOTYPERS)
+      for parameters in it.product(seeded_simulations, ['acme-pol'], ['scaffold'])
     ]
 
 
@@ -1022,7 +1022,7 @@ rule scaffold_describing:
   output:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/scaffold/describing.json"
   run:
-    scaffold_qsr_io(input[0], output[0], max_qs=2)
+    scaffold_qsr_io(input[0], output[0], max_qs=5)
 
 rule scaffold_candidates:
   input:
