@@ -1163,7 +1163,7 @@ rule haplotypes_and_truth:
   output:
     unaligned="output/{dataset}/{qc}/{read_mapper}/{reference}/{haplotyper}/truth_and_haplotypes_unaligned.fasta",
     aligned="output/{dataset}/{qc}/{read_mapper}/{reference}/{haplotyper}/truth_and_haplotypes.fasta",
-    progress=os.getcwd()+"output/{dataset}/{qc}/{read_mapper}/{reference}/{haplotyper}/progress.txt",
+    progress=os.getcwd()+"/output/{dataset}/{qc}/{read_mapper}/{reference}/{haplotyper}/progress.txt",
     csv="output/{dataset}/{qc}/{read_mapper}/{reference}/{haplotyper}/truth_and_haplotypes.csv",
     json="output/{dataset}/{qc}/{read_mapper}/{reference}/{haplotyper}/truth_and_haplotypes.json"
   run:
