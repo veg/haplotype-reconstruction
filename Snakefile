@@ -24,7 +24,7 @@ KNOWN_TRUTH = SIMULATED_DATASETS + ["FiveVirusMixIllumina_1"]
 ALL_REFERENCES = ["env", "rev", "vif", "pol", "prrt", "rt", "pr", "gag", "int", "tat"] # + ["nef", "vpr"] 
 REFERENCE_SUBSET = ["env", "pol", "gag"]
 HYPHY_PATH = "/Users/stephenshank/Software/lib/hyphy"
-HAPLOTYPERS = ["abayesqr", "regress_haplo", "quasirecomb", "scaffold"]
+HAPLOTYPERS = ["abayesqr", "regress_haplo", "quasirecomb", "superseal"]
 NUMBER_OF_READS = 300000
 with open('input/sarscov2_accessions.txt') as sarscov2_accession_file:
   SARSCOV2_ACCESSIONS = [
@@ -54,7 +54,7 @@ def get_dataset_gene_pairs(dataset, genes):
     accessions = [line.strip() for line in accession_file.readlines()]
   accession_gene_pairs = it.product(accessions, genes)
   return [
-    "output/%s/fastp/bowtie2/%s/acme/superreads.fasta" % pair
+    "output/%s/fastp/bowtie2/%s/superseal/superreads.fasta" % pair
     for pair in accession_gene_pairs
   ]
 
@@ -63,13 +63,13 @@ rule hiv:
   input:
     it.chain(
       get_dataset_gene_pairs(
-        'CurrentiPlosPath2019SRRs', ['acme-gag', 'acme-pol', 'acme-nef']
+        'CurrentiPlosPath2019SRRs', ['hiv-gag', 'hiv-pol', 'hiv-nef']
       ),
       get_dataset_gene_pairs(
-        'SwanstromJournalOfVirology2016SRRs', ['acme-env']
+        'SwanstromJournalOfVirology2016SRRs', ['hiv-env']
       ),
       get_dataset_gene_pairs(
-        'DialdestoroGenetics2016ERSs', ['acme-gag', 'acme-pol', 'acme-nef', 'acme-env']
+        'DialdestoroGenetics2016ERSs', ['hiv-gag', 'hiv-pol', 'hiv-nef', 'hiv-env']
       )
     )
 
@@ -82,16 +82,16 @@ rule simulation_study:
   input:
     [
       "output/%s/fastp/bowtie2/%s/%s/stop.txt" % parameters
-      for parameters in it.product(seeded_simulations, ['acme-pol'], ['scaffold'])
+      for parameters in it.product(seeded_simulations, ['hiv-pol'], ['superseal'])
     ]
 
 
 rule intrahost:
   input:
     expand(
-      "output/{dataset}/fastp/bowtie2/{reference}/scaffold/resolvable.json",
+      "output/{dataset}/fastp/bowtie2/{reference}/superseal/resolvable.json",
       dataset=['ERR76064%d' % i for i in range(3, 10)],
-      reference=['acme-env', 'acme-gag', 'acme-pol']
+      reference=['hiv-env', 'hiv-gag', 'hiv-pol']
     )
 
 rule all_haplotypers:
@@ -117,10 +117,10 @@ rule all_haplotypers:
       reference=REFERENCE_SUBSET
     )
 
-rule all_acme_reconstructing:
+rule all_superseal_reconstructing:
   input:
-    "output/sim-divergedPair_ar-10_seed-1/fastp/bowtie2/pol/acme/truth_and_haplotypes.json",
-    "output/sim-divergedTriplet_ar-10_seed-1/fastp/bowtie2/pol/acme/truth_and_haplotypes.json"
+    "output/sim-divergedPair_ar-10_seed-1/fastp/bowtie2/pol/superseal/truth_and_haplotypes.json",
+    "output/sim-divergedTriplet_ar-10_seed-1/fastp/bowtie2/pol/superseal/truth_and_haplotypes.json"
   output:
     "output/reconstruction_report.csv"
   run:
@@ -731,7 +731,7 @@ rule readreduce:
   shell:
     "readreduce -a resolve -l 30 -s 16 -o {output} {input}"
 
-# ACME haplotype reconstruction
+# superseal haplotype reconstruction
 
 WEIGHT_FILTER = 0
 
@@ -755,13 +755,13 @@ rule covarying_sites:
   input:
     rules.sort_and_index.output.bam
   output:
-    json="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/covarying_sites.json",
-    fasta="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/consensus.fasta",
-    covariation="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/covariation.csv",
-    start="output/{dataset}/{qc}/{read_mapper}/{reference}/scaffold/start.txt",
-    covarying_start="output/{dataset}/{qc}/{read_mapper}/{reference}/scaffold/times/cs_start.txt",
-    covarying_stop="output/{dataset}/{qc}/{read_mapper}/{reference}/scaffold/times/cs_stop.txt",
-    covarying_total="output/{dataset}/{qc}/{read_mapper}/{reference}/scaffold/times/cs_total.txt"
+    json="output/{dataset}/{qc}/{read_mapper}/{reference}/superseal/covarying_sites.json",
+    fasta="output/{dataset}/{qc}/{read_mapper}/{reference}/superseal/consensus.fasta",
+    covariation="output/{dataset}/{qc}/{read_mapper}/{reference}/superseal/covariation.csv",
+    start="output/{dataset}/{qc}/{read_mapper}/{reference}/superseal/start.txt",
+    covarying_start="output/{dataset}/{qc}/{read_mapper}/{reference}/superseal/times/cs_start.txt",
+    covarying_stop="output/{dataset}/{qc}/{read_mapper}/{reference}/superseal/times/cs_stop.txt",
+    covarying_total="output/{dataset}/{qc}/{read_mapper}/{reference}/superseal/times/cs_total.txt"
   run:
     write_time(output.covarying_start)
     write_time(output.start)
@@ -783,7 +783,7 @@ def covarying_truth_comparison_input(wildcards):
       known_dataset = dataset.split('_')[0]
     else:
       known_dataset = dataset
-    computed_string = "output/%s/%s/%s/%s/acme/covarying_sites.json"
+    computed_string = "output/%s/%s/%s/%s/superseal/covarying_sites.json"
     computed_arguments = (dataset, wildcards.qc, wildcards.read_mapper, wildcards.reference)
     computed = computed_string % computed_arguments
     truth = "output/truth/%s/%s_covarying_sites.json" % (known_dataset, wildcards.reference)
@@ -794,7 +794,7 @@ rule covarying_truth_comparison:
   input:
     covarying_truth_comparison_input
   output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/covarying_truth.json"
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/superseal/covarying_truth.json"
   run:
     covarying_truth(input[0], input[1], input[2], output[0])
 
@@ -803,10 +803,10 @@ rule superreads:
     alignment=rules.sort_and_index.output.bam,
     covarying_sites=rules.covarying_sites.output[0],
   output:
-    json="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/superreads.json",
-    superread_start="output/{dataset}/{qc}/{read_mapper}/{reference}/scaffold/times/sr_start.txt",
-    superread_stop="output/{dataset}/{qc}/{read_mapper}/{reference}/scaffold/times/sr_stop.txt",
-    superread_total="output/{dataset}/{qc}/{read_mapper}/{reference}/scaffold/times/sr_total.txt"
+    json="output/{dataset}/{qc}/{read_mapper}/{reference}/superseal/superreads.json",
+    superread_start="output/{dataset}/{qc}/{read_mapper}/{reference}/superseal/times/sr_start.txt",
+    superread_stop="output/{dataset}/{qc}/{read_mapper}/{reference}/superseal/times/sr_stop.txt",
+    superread_total="output/{dataset}/{qc}/{read_mapper}/{reference}/superseal/times/sr_total.txt"
   run:
     write_time(output.superread_start)
     superread_json_io(input.alignment, input.covarying_sites, output.json)
@@ -818,7 +818,7 @@ rule superread_fasta:
     cvs=rules.covarying_sites.output[0],
     sr=rules.superreads.output[0]
   output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/superreads.fasta"
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/superseal/superreads.fasta"
   run:
     superread_fasta_io(
       input.cvs, input.sr, output[0], weight_filter=WEIGHT_FILTER
@@ -828,7 +828,7 @@ rule superread_scatter_data:
   input:
     rules.superreads.output[0]
   output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/superreads.csv"
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/superseal/superreads.csv"
   run:
     superread_scatter_data(input[0], output[0])
 
@@ -836,7 +836,7 @@ rule superread_scatter_plot:
   input:
     rules.superread_scatter_data.output[0]
   output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/superread_scatter.png"
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/superseal/superread_scatter.png"
   script:
     "R/superread_scatterplot.R"
 
@@ -851,7 +851,7 @@ def inspect_superread_input(wildcards):
     bam_arguments = (dataset, wildcards.qc, wildcards.read_mapper, wildcards.reference)
     bam = bam_string % bam_arguments
     truth = "output/truth/%s/%s_gene.fasta" % (known_dataset, wildcards.reference)
-    sr_string = "output/%s/%s/%s/%s/acme/superreads.json"
+    sr_string = "output/%s/%s/%s/%s/superseal/superreads.json"
     sr_arguments = (dataset, wildcards.qc, wildcards.read_mapper, wildcards.reference)
     superreads = sr_string % sr_arguments
     truth = "output/references/%s.fasta" % wildcards.reference
@@ -862,9 +862,9 @@ rule inspect_superread:
   input:
     inspect_superread_input
   output:
-    bam="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/sr-{sr}/sorted.bam",
-    fasta="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/sr-{sr}/sorted.fasta",
-    ref="output/{dataset}/{qc}/{read_mapper}/{reference}/acme/sr-{sr}/sorted-ref.fasta"
+    bam="output/{dataset}/{qc}/{read_mapper}/{reference}/superseal/sr-{sr}/sorted.bam",
+    fasta="output/{dataset}/{qc}/{read_mapper}/{reference}/superseal/sr-{sr}/sorted.fasta",
+    ref="output/{dataset}/{qc}/{read_mapper}/{reference}/superseal/sr-{sr}/sorted-ref.fasta"
   run:
     pluck_superread_reads(input[1], int(wildcards.sr), input[0], output.bam)
     shell("bam2msa {output.bam} {output.fasta}")
@@ -875,7 +875,7 @@ rule inspect_superread_at_cvs:
     superread=rules.inspect_superread.output.ref,
     covarying_sites=rules.covarying_sites.output.json
   output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/sr-{sr}/sorted-ref-cvs.fasta"
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/superseal/sr-{sr}/sorted-ref-cvs.fasta"
   run:
     restrict_fasta_to_cvs(input.superread, input.covarying_sites, output[0])
 
@@ -906,7 +906,7 @@ def truth_at_cvs_input(wildcards):
     known_dataset = dataset.split('_')[0]
   else:
     known_dataset = dataset
-  computed_string = "output/%s/%s/%s/%s/acme/covarying_sites.json"
+  computed_string = "output/%s/%s/%s/%s/superseal/covarying_sites.json"
   computed_arguments = (dataset, wildcards.qc, wildcards.read_mapper, wildcards.reference)
   computed = computed_string % computed_arguments
   truth = "output/truth/%s/%s_gene.fasta" % (known_dataset, wildcards.reference)
@@ -916,7 +916,7 @@ rule truth_at_cvs:
   input:
     truth_at_cvs_input
   output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/truth-cvs.fasta"
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/superseal/truth-cvs.fasta"
   run:
     restrict_fasta_to_cvs(input[0], input[1], output[0])
 
@@ -925,7 +925,7 @@ rule truth_and_superreads_cvs:
     truth=rules.truth_at_cvs.output[0],
     superreads=rules.superread_fasta.output[0]
   output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/truth-and-superreads.fasta"
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/superseal/truth-and-superreads.fasta"
   shell:
     "cat {input.truth} {input.superreads} > {output}"
 
@@ -934,7 +934,7 @@ rule quantify_ar:
     fasta=rules.truth_at_cvs.output[0],
     json=rules.superreads.output[0]
   output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/truth-sr-cvs.json"
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/superseal/truth-sr-cvs.json"
   run:
     quantify_ar(input[0], input[1], output[0])
 
@@ -942,7 +942,7 @@ rule consolidate_sim_quantify_ar:
   input:
     json=rules.quantify_ar.output[0]
   output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/similar_consolidated.csv"
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/superseal/similar_consolidated.csv"
   run:
     consolidate_simjsons(input[0], output[0])
 
@@ -950,7 +950,7 @@ rule superread_graph:
   input:
     rules.superreads.output[0],
   output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/graph-full.json"
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/superseal/graph-full.json"
   run:
     graph_io(input[0], output[0], 'full')
 
@@ -958,7 +958,7 @@ rule reduced_superread_graph:
   input:
     rules.superreads.output[0],
   output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/graph-reduced.json"
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/superseal/graph-reduced.json"
   run:
     graph_io(input[0], output[0], 'reduced', minimum_weight=WEIGHT_FILTER)
 
@@ -966,15 +966,15 @@ rule incremental_superread_graph:
   input:
     rules.superreads.output[0],
   output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/graph-incremental.json"
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/superseal/graph-incremental.json"
   run:
     graph_io(input[0], output[0], 'incremental')
 
 rule candidates:
   input:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/graph-{graph_type}.json",
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/superseal/graph-{graph_type}.json",
   output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/describing-{graph_type}.json"
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/superseal/describing-{graph_type}.json"
   run:
     candidates_io(input[0], output[0])
 
@@ -985,7 +985,7 @@ rule regression:
     consensus=rules.covarying_sites.output.fasta,
     covarying_sites=rules.covarying_sites.output.json
   output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/haplotypes-{graph_type}.fasta"
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/superseal/haplotypes-{graph_type}.fasta"
   run:
     regression_io(
       input.superreads, input.describing, input.consensus,
@@ -994,9 +994,9 @@ rule regression:
 
 rule chosen_approach:
   input:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/haplotypes-reduced.fasta"
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/superseal/haplotypes-reduced.fasta"
   output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/haplotypes.fasta"
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/superseal/haplotypes.fasta"
   shell:
     "cp {input} {output}"
 
@@ -1004,7 +1004,7 @@ rule edge_list:
   input:
     rules.superreads.output[0]
   output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/edge_list.csv"
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/superseal/edge_list.csv"
   run:
     edge_list_io(input[0], output[0])
 
@@ -1012,53 +1012,53 @@ rule resolvable_regions:
   input:
     rules.superreads.output[0]
   output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/scaffold/resolvable.json"
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/superseal/resolvable.json"
   run:
     resolvable_regions_io(input[0], output[0])
 
-rule scaffold_describing:
+rule superseal_describing:
   input:
     rules.superreads.output[0]
   output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/scaffold/describing.json"
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/superseal/describing.json"
   run:
-    scaffold_qsr_io(input[0], output[0], max_qs=5)
+    superseal_qsr_io(input[0], output[0], max_qs=5)
 
-rule scaffold_candidates:
+rule superseal_candidates:
   input:
     superreads=rules.superreads.output[0],
-    description=rules.scaffold_describing.output[0]
+    description=rules.superseal_describing.output[0]
   output:
-    fasta="output/{dataset}/{qc}/{read_mapper}/{reference}/scaffold/candidates.fasta",
-    csv="output/{dataset}/{qc}/{read_mapper}/{reference}/scaffold/candidates.csv"
+    fasta="output/{dataset}/{qc}/{read_mapper}/{reference}/superseal/candidates.fasta",
+    csv="output/{dataset}/{qc}/{read_mapper}/{reference}/superseal/candidates.csv"
   run:
-    scaffold_candidates_io(
+    superseal_candidates_io(
       input.superreads, input.description,
       output.fasta, output.csv
     )
 
-rule scaffold_quasispecies:
+rule superseal_quasispecies:
   input:
-    candidates=rules.scaffold_candidates.output.fasta,
-    frequencies=rules.scaffold_candidates.output.csv,
+    candidates=rules.superseal_candidates.output.fasta,
+    frequencies=rules.superseal_candidates.output.csv,
     consensus=rules.covarying_sites.output.fasta,
     covarying_sites=rules.covarying_sites.output.json
   output:
-    fasta="output/{dataset}/{qc}/{read_mapper}/{reference}/scaffold/haplotypes.fasta",
-    stop="output/{dataset}/{qc}/{read_mapper}/{reference}/scaffold/stop.txt"
+    fasta="output/{dataset}/{qc}/{read_mapper}/{reference}/superseal/haplotypes.fasta",
+    stop="output/{dataset}/{qc}/{read_mapper}/{reference}/superseal/stop.txt"
   run:
-    simple_scaffold_reconstruction_io(
+    simple_superseal_reconstruction_io(
       input.candidates, input.frequencies, input.consensus,
       input.covarying_sites, output.fasta
     )
     write_time(output.stop)
 
-rule scaffold_ar_rate:
+rule superseal_ar_rate:
   input:
     superreads=rules.superreads.output[0],
-    description=rules.scaffold_describing.output[0]
+    description=rules.superseal_describing.output[0]
   output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/scaffold/ar.json"
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/superseal/ar.json"
   run:
     ar_rate_estimation_io(input.superreads, input.description, output[0])
 
@@ -1114,7 +1114,7 @@ rule generic_coverage_plot:
     "R/coverage_plot.R"
 
 def n_paths_boxplot_input(wildcards):
-  template_string = "output/sim-%s_ar-%d_seed-%d/fastp/bowtie2/%s/acme/graph.json"
+  template_string = "output/sim-%s_ar-%d_seed-%d/fastp/bowtie2/%s/superseal/graph.json"
   input_files = []
   for seed in range(1, 11):
     for ar in [0, 5, 10, 15, 20]:
@@ -1134,7 +1134,7 @@ rule superread_weight_distribution_data:
   input:
     rules.superreads.output[0]
   output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/superread_distribution.csv"
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/superseal/superread_distribution.csv"
   run:
     superread_weight_distribution_data(input[0], output[0])
 
@@ -1142,8 +1142,8 @@ rule superread_weight_distribution_plot:
   input:
     rules.superread_weight_distribution_data.output[0]
   output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/superread_histogram.png",
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/acme/superread_scatter_plot.png"
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/superseal/superread_histogram.png",
+    "output/{dataset}/{qc}/{read_mapper}/{reference}/superseal/superread_scatter_plot.png"
   script:
     "R/superread_distribution.R"
 
