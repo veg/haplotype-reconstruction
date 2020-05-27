@@ -446,7 +446,7 @@ rule bowtie2_index:
   shell:
     "bowtie2-build {input.reference} {params}"
 
-rule bowtie2_parameter_study:
+rule bowtie2_alignment:
   input:
     fastq="output/{dataset}/{qc}/qc.fastq",
     bt1=rules.bowtie2_index.output.bt1,
@@ -456,27 +456,17 @@ rule bowtie2_parameter_study:
     revbt1=rules.bowtie2_index.output.revbt1,
     revbt2=rules.bowtie2_index.output.revbt2
   output:
-    sam="output/{dataset}/{qc}/bowtie2/{reference}/mapped_b-{b}_m-{m}_q-{q}.sam",
-    bam="output/{dataset}/{qc}/bowtie2/{reference}/mapped_b-{b}_m-{m}_q-{q}.bam"
+    sam="output/{dataset}/{qc}/bowtie2/{reference}/mapped.sam",
+    bam="output/{dataset}/{qc}/bowtie2/{reference}/mapped.bam"
   params:
-    index_loc=lambda wildcards: "output/references/%s" % wildcards.reference,
-    score=lambda wildcards: "L,-%s,-%s" % (wildcards.b, wildcards.m)
+    index_loc=lambda wildcards: "output/references/%s" % wildcards.reference
   conda:
     "envs/ngs.yml"
   shell:
     """
-      bowtie2 -x {params.index_loc} -U {input.fastq} -S {output.sam} \
-        --score-min {params.score}
-      samtools view -Sbq {wildcards.q} {output.sam} > {output.bam}
+      bowtie2 -x {params.index_loc} -U {input.fastq} -S {output.sam}
+      samtools view -Sbq 10 {output.sam} > {output.bam}
     """
-
-rule bowtie2_alignment:
-  input:
-    "output/{dataset}/{qc}/bowtie2/{reference}/mapped_b-1_m-1_q-1.bam"
-  output:
-    "output/{dataset}/{qc}/bowtie2/{reference}/mapped.bam"
-  shell:
-    "cp {input} {output}"
 
 rule minimap2:
   input:
@@ -1064,38 +1054,6 @@ rule superseal_ar_rate:
 
 
 # Simulation studies
-
-rule simulation_coverage:
-  input:
-    rules.bowtie2_parameter_study.output.bam
-  output:
-    "output/{dataset}/{qc}/bowtie2/{reference}/coverage_b-{b}_m-{m}_q-{q}.csv"
-  run:
-    simulation_coverage(
-      input[0], output[0],
-      wildcards.b, wildcards.m, wildcards.q
-    )
-
-rule master_coverage_data:
-  input:
-    expand(
-      "output/{{dataset}}/{{qc}}/bowtie2/{{reference}}/coverage_b-{b}_m-{m}_q-{q}.csv",
-      b=[.6, 1.2, 1.8],
-      m=[.6, 1.2, 1.8],
-      q=[0, 20, 40]
-    )
-  output:
-    "output/{dataset}/{qc}/bowtie2/{reference}/master-coverage.csv"
-  shell:
-    "cat {input} > {output}"
-
-rule master_coverage_plot:
-  input:
-    rules.master_coverage_data.output[0]
-  output:
-    "output/{dataset}/{qc}/bowtie2/{reference}/master-coverage.png"
-  script:
-    "R/master_coverage_plot.R"
 
 rule generic_coverage_data:
   input:
