@@ -520,31 +520,24 @@ rule sorted_fasta:
   shell:
     "bam2msa {input} {output}"
 
-rule deduplicated:
-  input:
-    rules.sort_and_index.output.bam
-  output:
-    bam="output/{dataset}/{qc}/{read_mapper}/{reference}/deduped.bam",
-    metrics="output/{dataset}/{qc}/{read_mapper}/{reference}/picard_metrics.txt"
-  shell:
-    """
-      picard MarkDuplicates \
-        I={input} O={output.bam} M={output.metrics} \
-        REMOVE_DUPLICATES=true ASSUME_SORTED=true
-    """
-
 rule realigned:
   input:
-    bam=rules.deduplicated.output.bam,
+    bam=rules.sort_and_index.output.bam,
     reference=rules.bowtie2_index.input.reference
   output:
-    "output/{dataset}/{qc}/{read_mapper}/{reference}/realigned.bam"
+    unsorted="output/{dataset}/{qc}/{read_mapper}/{reference}/realigned-unsorted.bam",
+    sort="output/{dataset}/{qc}/{read_mapper}/{reference}/realigned.bam",
+    index="output/{dataset}/{qc}/{read_mapper}/{reference}/realigned.bam.bai"
   shell:
-    "lofreq viterbi -f {input.reference} -o {output} {input.bam}"
+    """
+      lofreq viterbi -f {input.reference} -o {output.unsorted} {input.bam}
+      samtools sort {output.unsorted} > {output.sort}
+      samtools index {output.sort}
+    """
 
 rule call_variants:
   input:
-    bam=rules.realigned.output[0],
+    bam=rules.realigned.output.sort,
     reference=rules.bowtie2_index.input.reference
   output:
     "output/{dataset}/{qc}/{read_mapper}/{reference}/variants.vcf"
@@ -791,7 +784,7 @@ rule covarying_truth_comparison:
 rule superreads:
   input:
     alignment=rules.sort_and_index.output.bam,
-    covarying_sites=rules.covarying_sites.output[0],
+    covarying_sites=rules.call_variants.output[0],
   output:
     json="output/{dataset}/{qc}/{read_mapper}/{reference}/superseal/superreads.json",
     superread_start="output/{dataset}/{qc}/{read_mapper}/{reference}/superseal/times/sr_start.txt",
